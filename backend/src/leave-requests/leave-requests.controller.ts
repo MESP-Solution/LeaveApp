@@ -8,13 +8,13 @@ import {
   Query,
 } from '@nestjs/common';
 import {
-  ApiBadRequestResponse,
-  ApiCreatedResponse,
-  ApiNotFoundResponse,
-  ApiOkResponse,
   ApiQuery,
   ApiTags,
 } from '@nestjs/swagger';
+import {
+  ApiErrorResponse,
+  ApiSuccessResponse,
+} from '../common/swagger/api-response.decorator';
 import { CreateLeaveRequestDto } from './dto/create-leave-request.dto';
 import { LeaveRequestResponseDto } from './dto/leave-request-response.dto';
 import { ProcessLeaveRequestDto } from './dto/process-leave-request.dto';
@@ -34,8 +34,9 @@ export class LeaveRequestsController {
     enum: LEAVE_REQUEST_STATUSES,
     required: false,
   })
-  @ApiOkResponse({
+  @ApiSuccessResponse({
     description: 'Leave request list',
+    status: 200,
     isArray: true,
     type: LeaveRequestResponseDto,
   })
@@ -44,9 +45,10 @@ export class LeaveRequestsController {
     return this.leaveRequestsService.findAll(status);
   }
 
-  @ApiNotFoundResponse({ description: 'Leave request not found' })
-  @ApiOkResponse({
+  @ApiErrorResponse({ status: 404, description: 'Leave request not found' })
+  @ApiSuccessResponse({
     description: 'Leave request detail',
+    status: 200,
     type: LeaveRequestResponseDto,
   })
   @Get(':id')
@@ -54,10 +56,11 @@ export class LeaveRequestsController {
     return this.leaveRequestsService.findById(id);
   }
 
-  @ApiBadRequestResponse({ description: 'Invalid leave request payload' })
-  @ApiNotFoundResponse({ description: 'Employee not found' })
-  @ApiCreatedResponse({
+  @ApiErrorResponse({ status: 400, description: 'Invalid leave request payload' })
+  @ApiErrorResponse({ status: 404, description: 'Employee not found' })
+  @ApiSuccessResponse({
     description: 'Leave request created',
+    status: 201,
     type: LeaveRequestResponseDto,
   })
   @Post()
@@ -65,12 +68,17 @@ export class LeaveRequestsController {
     return this.leaveRequestsService.create(dto);
   }
 
-  @ApiBadRequestResponse({
+  @ApiErrorResponse({
+    status: 400,
     description: 'Invalid approval payload or processed request',
   })
-  @ApiNotFoundResponse({ description: 'Leave request or manager not found' })
-  @ApiOkResponse({
+  @ApiErrorResponse({
+    status: 404,
+    description: 'Leave request or manager not found',
+  })
+  @ApiSuccessResponse({
     description: 'Leave request approved',
+    status: 200,
     type: LeaveRequestResponseDto,
   })
   @Patch(':id/approve')
@@ -78,12 +86,17 @@ export class LeaveRequestsController {
     return this.leaveRequestsService.approve(id, dto);
   }
 
-  @ApiBadRequestResponse({
+  @ApiErrorResponse({
+    status: 400,
     description: 'Invalid rejection payload or processed request',
   })
-  @ApiNotFoundResponse({ description: 'Leave request or manager not found' })
-  @ApiOkResponse({
+  @ApiErrorResponse({
+    status: 404,
+    description: 'Leave request or manager not found',
+  })
+  @ApiSuccessResponse({
     description: 'Leave request rejected',
+    status: 200,
     type: LeaveRequestResponseDto,
   })
   @Patch(':id/reject')

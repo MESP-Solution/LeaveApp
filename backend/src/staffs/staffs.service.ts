@@ -1,61 +1,92 @@
-import { EntityRepository } from '@mikro-orm/mysql';
+import { createHash } from 'node:crypto';
+import { EntityManager } from '@mikro-orm/core';
 import { InjectRepository } from '@mikro-orm/nestjs';
+import { EntityRepository } from '@mikro-orm/mysql';
 import {
   ConflictException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import * as bcrypt from 'bcrypt';
 import { Role } from '../database/entities/role.entity';
 import { Staff } from '../database/entities/staff.entity';
 import { CreateStaffDto } from './dto/create-staff.dto';
+import { StaffResponseDto } from './dto/staff-response.dto';
+import { UpdateStaffDto } from './dto/update-staff.dto';
 
 @Injectable()
 export class StaffsService {
   constructor(
-    @InjectRepository(Role)
-    private readonly roleRepository: EntityRepository<Role>,
     @InjectRepository(Staff)
     private readonly staffRepository: EntityRepository<Staff>,
+    @InjectRepository(Role)
+    private readonly roleRepository: EntityRepository<Role>,
+    private readonly em: EntityManager,
   ) {}
 
-  async create(dto: CreateStaffDto): Promise<Staff> {
-    const email = this.normalizeEmail(dto.email);
-    const existingStaff = await this.staffRepository.findOne({ email });
-    if (existingStaff) {
-      throw new ConflictException('Email already exists');
-    }
+  async findAll(): Promise<StaffResponseDto[]> {
+    const staffs = await this.staffRepository.findAll({ populate: ['role'] });
+    return staffs.map((staff) => this.toResponse(staff));
+  }
 
-    const role = dto.roleId
-      ? await this.findRoleById(dto.roleId)
-      : await this.findRoleByName('STAFF');
+  async findById(id: number): Promise<StaffResponseDto> {
+    const staff = await this.findStaffEntity(id);
+    return this.toResponse(staff);
+  }
+
+  async create(dto: CreateStaffDto): Promise<StaffResponseDto> {
+    await this.ensureEmailUnique(dto.email);
+    const role = await this.resolveRole(dto.roleId);
 
     const staff = this.staffRepository.create({
-      createdAt: new Date(),
-      email,
       fullName: dto.fullName.trim(),
-      leaveCredit: dto.leaveCredit ?? 12,
-      passwordHash: await bcrypt.hash(dto.password, 10),
+      email: dto.email.toLowerCase(),
+      passwordHash: this.hashPassword(dto.password),
       role,
+      leaveCredit: dto.leaveCredit ?? 12,
+      createdAt: new Date(),
       updatedAt: new Date(),
     });
 
-    await this.staffRepository.getEntityManager().persistAndFlush(staff);
-    return staff;
+    await this.em.persistAndFlush(staff);
+    await this.em.populate(staff, ['role']);
+    return this.toResponse(staff);
   }
 
-  async findAll(): Promise<Staff[]> {
-    return this.staffRepository.findAll({ populate: ['role'] });
+  async update(id: number, dto: UpdateStaffDto): Promise<StaffResponseDto> {
+    const staff = await this.findStaffEntity(id);
+
+    if (dto.email && dto.email.toLowerCase() !== staff.email) {
+      await this.ensureEmailUnique(dto.email);
+      staff.email = dto.email.toLowerCase();
+    }
+
+    if (dto.fullName) {
+      staff.fullName = dto.fullName.trim();
+    }
+
+    if (dto.password) {
+      staff.passwordHash = this.hashPassword(dto.password);
+    }
+
+    if (typeof dto.leaveCredit === 'number') {
+      staff.leaveCredit = dto.leaveCredit;
+    }
+
+    if (dto.roleId) {
+      staff.role = await this.resolveRole(dto.roleId);
+    }
+
+    await this.em.flush();
+    await this.em.populate(staff, ['role']);
+    return this.toResponse(staff);
   }
 
-  async findByEmailWithPassword(email: string): Promise<Staff | null> {
-    return this.staffRepository.findOne(
-      { email: this.normalizeEmail(email) },
-      { populate: ['role'] },
-    );
+  async remove(id: number): Promise<void> {
+    const staff = await this.findStaffEntity(id);
+    await this.em.removeAndFlush(staff);
   }
 
-  async findById(id: number): Promise<Staff> {
+  private async findStaffEntity(id: number): Promise<Staff> {
     const staff = await this.staffRepository.findOne(
       { id },
       { populate: ['role'] },
@@ -67,14 +98,41 @@ export class StaffsService {
     return staff;
   }
 
-  async findByRoleName(roleName: string): Promise<Staff[]> {
-    return this.staffRepository.find(
-      { role: { name: roleName } },
-      { populate: ['role'] },
-    );
+  private async resolveRole(roleId?: number): Promise<Role> {
+    if (roleId) {
+      const role = await this.roleRepository.findOne({ id: roleId });
+      if (!role) {
+        throw new NotFoundException('Role not found');
+      }
+
+      return role;
+    }
+
+    const defaultRole = await this.roleRepository.findOne({ name: 'STAFF' });
+    if (!defaultRole) {
+      throw new NotFoundException(
+        'Default role STAFF not found. Seed roles before creating staff.',
+      );
+    }
+
+    return defaultRole;
   }
 
-  toResponse(staff: Staff) {
+  private async ensureEmailUnique(email: string): Promise<void> {
+    const existingStaff = await this.staffRepository.findOne({
+      email: email.toLowerCase(),
+    });
+
+    if (existingStaff) {
+      throw new ConflictException('Email already exists');
+    }
+  }
+
+  private hashPassword(password: string): string {
+    return createHash('sha256').update(password).digest('hex');
+  }
+
+  private toResponse(staff: Staff): StaffResponseDto {
     return {
       id: staff.id,
       fullName: staff.fullName,
@@ -83,27 +141,5 @@ export class StaffsService {
       leaveCredit: staff.leaveCredit,
       createdAt: staff.createdAt.toISOString(),
     };
-  }
-
-  private async findRoleById(id: number): Promise<Role> {
-    const role = await this.roleRepository.findOne({ id });
-    if (!role) {
-      throw new NotFoundException('Role not found');
-    }
-
-    return role;
-  }
-
-  private async findRoleByName(name: string): Promise<Role> {
-    const role = await this.roleRepository.findOne({ name });
-    if (!role) {
-      throw new NotFoundException(`Role ${name} not found`);
-    }
-
-    return role;
-  }
-
-  private normalizeEmail(email: string): string {
-    return email.trim().toLowerCase();
   }
 }

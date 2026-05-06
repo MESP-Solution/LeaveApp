@@ -3,27 +3,18 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { EntityRepository } from '@mikro-orm/mysql';
-import { InjectRepository } from '@mikro-orm/nestjs';
-import { LeaveRequest as DbLeaveRequest } from '../database/entities/leave-request.entity';
-import { LeaveStatus } from '../database/enums/leave-status.enum';
-import { MailService } from '../mail/mail.service';
-import { StaffsService } from '../staffs/staffs.service';
 import { CreateLeaveRequestDto } from './dto/create-leave-request.dto';
 import { ProcessLeaveRequestDto } from './dto/process-leave-request.dto';
 import { LeaveRequest, LeaveRequestStatus } from './leave-request.model';
 
 @Injectable()
 export class LeaveRequestsService {
-  constructor(
-    @InjectRepository(DbLeaveRequest)
-    private readonly leaveRequestRepository: EntityRepository<DbLeaveRequest>,
-    private readonly staffsService: StaffsService,
-    private readonly mailService: MailService,
-  ) {}
+  private readonly leaveRequests = new Map<string, LeaveRequest>();
+
+  constructor() {}
 
   async create(dto: CreateLeaveRequestDto): Promise<LeaveRequest> {
-    const staff = await this.staffsService.findById(dto.staffId);
+    const totalDays = this.calculateBusinessDays(dto.startDate, dto.endDate);
 
     if (!dto.reason?.trim()) {
       throw new BadRequestException('Leave reason is required');
@@ -33,34 +24,21 @@ export class LeaveRequestsService {
     }
     await this.ensureNoDuplicateRequest(staff.id, dto.leaveDate);
 
-    const leaveRequest = this.leaveRequestRepository.create({
-      createdAt: new Date(),
-      leaveDate: dto.leaveDate,
+    const leaveRequest: LeaveRequest = {
+      id: crypto.randomUUID(),
+      employeeId: dto.employeeId,
+      employeeName: dto.employeeId,
+      employeeEmail: `${dto.employeeId}@example.local`,
+      startDate: dto.startDate,
+      endDate: dto.endDate,
+      totalDays,
       reason: dto.reason.trim(),
-      staff,
-      status: LeaveStatus.PENDING,
-      updatedAt: new Date(),
-    });
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    };
 
-    await this.leaveRequestRepository
-      .getEntityManager()
-      .persistAndFlush(leaveRequest);
-
-    await this.notifyHeads(leaveRequest);
-
-    return this.toResponse(leaveRequest);
-  }
-
-  async findAll(status?: LeaveRequestStatus): Promise<LeaveRequest[]> {
-    const requests = await this.leaveRequestRepository.find(
-      status ? { status: status as LeaveStatus } : {},
-      {
-        orderBy: { createdAt: 'DESC' },
-        populate: ['resolvedByStaff', 'staff'],
-      },
-    );
-
-    return requests.map((request) => this.toResponse(request));
+    this.leaveRequests.set(leaveRequest.id, leaveRequest);
+    return leaveRequest;
   }
 
   async findById(id: string): Promise<LeaveRequest> {
@@ -95,32 +73,21 @@ export class LeaveRequestsService {
     dto: ProcessLeaveRequestDto,
     status: LeaveStatus,
   ): Promise<LeaveRequest> {
-    const manager = await this.staffsService.findById(dto.managerId);
-    if (!['HEAD', 'MANAGER', 'ADMIN'].includes(manager.role.name)) {
-      throw new BadRequestException(
-        'Only HEAD, MANAGER, or ADMIN can process leave requests',
-      );
-    }
-
-    const leaveRequest = await this.findEntityById(id);
-    if (leaveRequest.status !== LeaveStatus.PENDING) {
+    const leaveRequest = this.findById(id);
+    if (leaveRequest.status !== 'pending') {
       throw new BadRequestException('Leave request is already processed');
     }
 
-    leaveRequest.status = status;
-    leaveRequest.resolvedByStaff = manager;
-    leaveRequest.resolvedAt = new Date();
-    leaveRequest.rejectReason =
-      status === LeaveStatus.REJECTED ? dto.note?.trim() : undefined;
+    const updatedRequest: LeaveRequest = {
+      ...leaveRequest,
+      status,
+      managerNote: dto.note?.trim(),
+      processedBy: dto.managerId,
+      processedAt: new Date().toISOString(),
+    };
 
-    await this.leaveRequestRepository.getEntityManager().flush();
-    await this.mailService.send({
-      to: leaveRequest.staff.email,
-      subject: `Leave request ${status}`,
-      text: `Your leave request ${leaveRequest.id} was ${status}.`,
-    });
-
-    return this.toResponse(leaveRequest);
+    this.leaveRequests.set(id, updatedRequest);
+    return updatedRequest;
   }
 
   private async ensureNoDuplicateRequest(

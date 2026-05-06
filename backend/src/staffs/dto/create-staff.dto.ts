@@ -18,15 +18,11 @@ export class CreateStaffDto {
   @IsEmail()
   email!: string;
 
-  @ApiProperty({ example: '12345678' })
+  @ApiProperty({ example: 'StrongP@ssw0rd' })
   @IsString()
-  @MinLength(8)
   password!: string;
 
-  @ApiPropertyOptional({
-    example: 1,
-    description: 'Role id. Defaults to STAFF.',
-  })
+  @ApiPropertyOptional({ example: 1, description: 'Role id. Defaults to STAFF.' })
   @IsOptional()
   @IsInt()
   @Min(1)

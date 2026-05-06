@@ -6,7 +6,7 @@ import { StaffsController } from './staffs.controller';
 import { StaffsService } from './staffs.service';
 
 @Module({
-  imports: [MikroOrmModule.forFeature([Role, Staff])],
+  imports: [MikroOrmModule.forFeature([Staff, Role])],
   controllers: [StaffsController],
   providers: [StaffsService],
   exports: [StaffsService],
