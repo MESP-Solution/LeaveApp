@@ -1,0 +1,525 @@
+{
+  "namespaces": [],
+  "tables": [
+    {
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "unsigned": true,
+          "autoincrement": true,
+          "primary": true,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": 10,
+          "scale": 0,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "integer"
+        },
+        "staff_id": {
+          "name": "staff_id",
+          "type": "int",
+          "unsigned": true,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": 10,
+          "scale": 0,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "integer"
+        },
+        "leave_date": {
+          "name": "leave_date",
+          "type": "date",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "date"
+        },
+        "reason": {
+          "name": "reason",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": 65535,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "text"
+        },
+        "status": {
+          "name": "status",
+          "type": "enum('PENDING','APPROVED','REJECTED')",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 8,
+          "precision": null,
+          "scale": null,
+          "default": "'PENDING'",
+          "comment": null,
+          "enumItems": [
+            "PENDING",
+            "APPROVED",
+            "REJECTED"
+          ],
+          "mappedType": "enum"
+        },
+        "resolved_by": {
+          "name": "resolved_by",
+          "type": "int",
+          "unsigned": true,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": 10,
+          "scale": 0,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "integer"
+        },
+        "reject_reason": {
+          "name": "reject_reason",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": 65535,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "text"
+        },
+        "resolved_at": {
+          "name": "resolved_at",
+          "type": "datetime(3)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": 3,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "datetime"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime(3)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 3,
+          "precision": null,
+          "scale": null,
+          "default": "current_timestamp(3)",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "datetime"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "datetime(3)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 3,
+          "precision": null,
+          "scale": null,
+          "default": "current_timestamp(3)",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "datetime",
+          "extra": "on update CURRENT_TIMESTAMP(3)"
+        }
+      },
+      "name": "leave_requests",
+      "indexes": [
+        {
+          "columnNames": [
+            "resolved_by"
+          ],
+          "keyName": "leave_requests_resolved_by_foreign",
+          "unique": false,
+          "primary": false,
+          "constraint": false
+        },
+        {
+          "columnNames": [
+            "staff_id"
+          ],
+          "keyName": "leave_requests_staff_id_index",
+          "unique": false,
+          "primary": false,
+          "constraint": false
+        },
+        {
+          "columnNames": [
+            "status"
+          ],
+          "keyName": "leave_requests_status_index",
+          "unique": false,
+          "primary": false,
+          "constraint": false
+        },
+        {
+          "columnNames": [
+            "id"
+          ],
+          "keyName": "PRIMARY",
+          "unique": true,
+          "primary": true,
+          "constraint": true
+        }
+      ],
+      "checks": [],
+      "foreignKeys": {
+        "leave_requests_resolved_by_foreign": {
+          "columnNames": [
+            "resolved_by"
+          ],
+          "constraintName": "leave_requests_resolved_by_foreign",
+          "localTableName": "leave_requests",
+          "referencedTableName": "staffs",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "updateRule": "cascade",
+          "deleteRule": "set null"
+        },
+        "leave_requests_staff_id_foreign": {
+          "columnNames": [
+            "staff_id"
+          ],
+          "constraintName": "leave_requests_staff_id_foreign",
+          "localTableName": "leave_requests",
+          "referencedTableName": "staffs",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "updateRule": "cascade",
+          "deleteRule": "no action"
+        }
+      },
+      "nativeEnums": {},
+      "comment": ""
+    },
+    {
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "unsigned": true,
+          "autoincrement": true,
+          "primary": true,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": 10,
+          "scale": 0,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "integer"
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(64)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": true,
+          "length": 64,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
+        }
+      },
+      "name": "roles",
+      "indexes": [
+        {
+          "columnNames": [
+            "id"
+          ],
+          "keyName": "PRIMARY",
+          "unique": true,
+          "primary": true,
+          "constraint": true
+        },
+        {
+          "columnNames": [
+            "name"
+          ],
+          "keyName": "roles_name_unique",
+          "unique": true,
+          "primary": false,
+          "constraint": true
+        }
+      ],
+      "checks": [],
+      "foreignKeys": {},
+      "nativeEnums": {},
+      "comment": ""
+    },
+    {
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "unsigned": true,
+          "autoincrement": true,
+          "primary": true,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": 10,
+          "scale": 0,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "integer"
+        },
+        "full_name": {
+          "name": "full_name",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
+        },
+        "email": {
+          "name": "email",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": true,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
+        },
+        "password_hash": {
+          "name": "password_hash",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
+        },
+        "role_id": {
+          "name": "role_id",
+          "type": "int",
+          "unsigned": true,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": 10,
+          "scale": 0,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "integer"
+        },
+        "leave_credit": {
+          "name": "leave_credit",
+          "type": "int",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": 10,
+          "scale": 0,
+          "default": "12",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "integer"
+        },
+        "created_by": {
+          "name": "created_by",
+          "type": "int",
+          "unsigned": true,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": 10,
+          "scale": 0,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "integer"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime(3)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 3,
+          "precision": null,
+          "scale": null,
+          "default": "current_timestamp(3)",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "datetime"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "datetime(3)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 3,
+          "precision": null,
+          "scale": null,
+          "default": "current_timestamp(3)",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "datetime",
+          "extra": "on update CURRENT_TIMESTAMP(3)"
+        }
+      },
+      "name": "staffs",
+      "indexes": [
+        {
+          "columnNames": [
+            "id"
+          ],
+          "keyName": "PRIMARY",
+          "unique": true,
+          "primary": true,
+          "constraint": true
+        },
+        {
+          "columnNames": [
+            "created_by"
+          ],
+          "keyName": "staffs_created_by_index",
+          "unique": false,
+          "primary": false,
+          "constraint": false
+        },
+        {
+          "columnNames": [
+            "email"
+          ],
+          "keyName": "staffs_email_unique",
+          "unique": true,
+          "primary": false,
+          "constraint": true
+        },
+        {
+          "columnNames": [
+            "role_id"
+          ],
+          "keyName": "staffs_role_id_index",
+          "unique": false,
+          "primary": false,
+          "constraint": false
+        }
+      ],
+      "checks": [],
+      "foreignKeys": {
+        "staffs_created_by_foreign": {
+          "columnNames": [
+            "created_by"
+          ],
+          "constraintName": "staffs_created_by_foreign",
+          "localTableName": "staffs",
+          "referencedTableName": "staffs",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "updateRule": "cascade",
+          "deleteRule": "set null"
+        },
+        "staffs_role_id_foreign": {
+          "columnNames": [
+            "role_id"
+          ],
+          "constraintName": "staffs_role_id_foreign",
+          "localTableName": "staffs",
+          "referencedTableName": "roles",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "updateRule": "cascade",
+          "deleteRule": "no action"
+        }
+      },
+      "nativeEnums": {},
+      "comment": ""
+    }
+  ],
+  "nativeEnums": {}
+}

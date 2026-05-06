@@ -1,0 +1,12 @@
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: leaveapp
+      MYSQL_USER: leaveapp
+      MYSQL_PASSWORD: leaveapp
+      MYSQL_ROOT_PASSWORD: root
+    ports:
+      - '3306:3306'
+    command: --character-set-server=utf8mb4 --collation-server=utf8mb4_unicode_ci
