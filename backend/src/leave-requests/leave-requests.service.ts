@@ -3,8 +3,6 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { EmployeesService } from '../employees/employees.service';
-import { MailService } from '../mail/mail.service';
 import { CreateLeaveRequestDto } from './dto/create-leave-request.dto';
 import { ProcessLeaveRequestDto } from './dto/process-leave-request.dto';
 import { LeaveRequest, LeaveRequestStatus } from './leave-request.model';
@@ -13,13 +11,9 @@ import { LeaveRequest, LeaveRequestStatus } from './leave-request.model';
 export class LeaveRequestsService {
   private readonly leaveRequests = new Map<string, LeaveRequest>();
 
-  constructor(
-    private readonly employeesService: EmployeesService,
-    private readonly mailService: MailService,
-  ) {}
+  constructor() {}
 
   async create(dto: CreateLeaveRequestDto): Promise<LeaveRequest> {
-    const employee = this.employeesService.findById(dto.employeeId);
     const totalDays = this.calculateBusinessDays(dto.startDate, dto.endDate);
 
     if (!dto.reason?.trim()) {
@@ -28,9 +22,9 @@ export class LeaveRequestsService {
 
     const leaveRequest: LeaveRequest = {
       id: crypto.randomUUID(),
-      employeeId: employee.id,
-      employeeName: employee.name,
-      employeeEmail: employee.email,
+      employeeId: dto.employeeId,
+      employeeName: dto.employeeId,
+      employeeEmail: `${dto.employeeId}@example.local`,
       startDate: dto.startDate,
       endDate: dto.endDate,
       totalDays,
@@ -40,12 +34,6 @@ export class LeaveRequestsService {
     };
 
     this.leaveRequests.set(leaveRequest.id, leaveRequest);
-    await this.mailService.send({
-      to: employee.email,
-      subject: 'Leave request submitted',
-      text: `Your leave request ${leaveRequest.id} is pending review.`,
-    });
-
     return leaveRequest;
   }
 
@@ -81,13 +69,6 @@ export class LeaveRequestsService {
     dto: ProcessLeaveRequestDto,
     status: LeaveRequestStatus,
   ): Promise<LeaveRequest> {
-    const manager = this.employeesService.findById(dto.managerId);
-    if (manager.role === 'employee') {
-      throw new BadRequestException(
-        'Only manager or HR can process leave requests',
-      );
-    }
-
     const leaveRequest = this.findById(id);
     if (leaveRequest.status !== 'pending') {
       throw new BadRequestException('Leave request is already processed');
@@ -97,17 +78,11 @@ export class LeaveRequestsService {
       ...leaveRequest,
       status,
       managerNote: dto.note?.trim(),
-      processedBy: manager.id,
+      processedBy: dto.managerId,
       processedAt: new Date().toISOString(),
     };
 
     this.leaveRequests.set(id, updatedRequest);
-    await this.mailService.send({
-      to: updatedRequest.employeeEmail,
-      subject: `Leave request ${status}`,
-      text: `Your leave request ${updatedRequest.id} was ${status}.`,
-    });
-
     return updatedRequest;
   }
 
