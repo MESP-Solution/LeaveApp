@@ -47,7 +47,7 @@ export function readApiErrorMessage(payload: unknown, status: number): string {
     return "Dữ liệu xung đột với trạng thái hiện tại.";
   }
   if (status === 503) {
-    return "Không kết nối được backend.";
+    return "Không kết nối được máy chủ.";
   }
 
   if (candidate && typeof candidate === "object" && "message" in candidate) {

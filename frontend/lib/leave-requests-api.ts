@@ -1,4 +1,4 @@
-import type { LeaveRequestRecord } from "@/types/leave-app";
+import type { LeaveRequestRecord, LeaveSession } from "@/types/leave-app";
 import { readApiErrorMessage, readSuccessResponse, unwrapApiResponse } from "./api-response";
 import { mapLeaveRequestFromApi } from "./leave-app-mappers";
 import { readAccessToken } from "./session";
@@ -7,6 +7,7 @@ type LeaveRequestApiDto = {
   id: number;
   staffId: number;
   leaveDate: string;
+  type?: string;
   reason: string;
   status: "pending" | "approved" | "rejected";
   rejectReason?: string;
@@ -123,6 +124,7 @@ export async function rejectLeaveRequest(id: number, note: string): Promise<Leav
 export async function createLeaveRequest(input: {
   staffId: number;
   leaveDate: string;
+  type_leave: LeaveSession;
   reason: string;
 }): Promise<LeaveRequestRecord[]> {
   const response = await authorizedFetch("/api/leave-requests", {
@@ -130,8 +132,8 @@ export async function createLeaveRequest(input: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       staffId: input.staffId,
-      startDate: input.leaveDate,
-      endDate: input.leaveDate,
+      leaveDate: input.leaveDate,
+      type: input.type_leave,
       reason: input.reason,
     }),
   });

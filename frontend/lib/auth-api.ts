@@ -40,7 +40,7 @@ export async function loginWithEmailPassword(
 
   const candidate = unwrapApiPayload(payload);
   if (!isLoginResponse(candidate)) {
-    throw new Error("Phan hoi dang nhap tu backend khong dung dinh dang.");
+    throw new Error("Phản hồi đăng nhập từ backend không đúng định dạng.");
   }
 
   return {
@@ -66,7 +66,7 @@ export async function getCurrentStaff(): Promise<StaffRecord | undefined> {
 
   const candidate = unwrapApiPayload(payload);
   if (!isAuthMeResponse(candidate)) {
-    throw new Error("Phan hoi xac thuc tu backend khong dung dinh dang.");
+    throw new Error("Phản hồi xác thực từ backend không đúng định dạng.");
   }
 
   return mapStaff(candidate.staff);

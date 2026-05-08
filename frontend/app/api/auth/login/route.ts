@@ -63,7 +63,7 @@ export async function POST(request: Request) {
     return response;
   } catch {
     return NextResponse.json(
-      { message: "Khong ket noi duoc backend dang nhap." },
+      { message: "Không kết nối được máy chủ đăng nhập." },
       { status: 503 },
     );
   }

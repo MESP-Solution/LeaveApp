@@ -2,7 +2,8 @@
 
 import { useState } from "react";
 import type { LeaveRequestPaginationMeta } from "@/lib/leave-requests-api";
-import type { LeaveRequestRecord, StaffRecord } from "@/types/leave-app";
+import { leaveSessionCreditCost, leaveSessionOptions } from "@/lib/leave-session";
+import type { LeaveRequestRecord, LeaveSession, StaffRecord } from "@/types/leave-app";
 import { InlineAlert } from "./inline-alert";
 import { RequestTable } from "./request-table";
 import { SectionHeader } from "./section-header";
@@ -18,7 +19,12 @@ export function StaffWorkspace({
   staffs,
 }: {
   onRequestsPageChange: (nextPage: number) => Promise<void> | void;
-  onSubmit: (staffId: number, leaveDate: string, reason: string) => Promise<void>;
+  onSubmit: (
+    staffId: number,
+    leaveDate: string,
+    type_leave: LeaveSession,
+    reason: string,
+  ) => Promise<void>;
   onViewRequest?: (request: LeaveRequestRecord) => void;
   requests: LeaveRequestRecord[];
   requestsMeta?: LeaveRequestPaginationMeta;
@@ -27,8 +33,10 @@ export function StaffWorkspace({
   staffs: StaffRecord[];
 }) {
   const [leaveDate, setLeaveDate] = useState("");
+  const [typeLeave, setTypeLeave] = useState<LeaveSession>("FULL");
   const [reason, setReason] = useState("");
   const [message, setMessage] = useState<string>();
+  const todayDateKey = getTodayDateKey();
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -38,8 +46,12 @@ export function StaffWorkspace({
       setMessage("Cần nhập ngày nghỉ và lý do.");
       return;
     }
-    if (staff.leaveCredit <= 0) {
-      setMessage("Nhân viên đã hết ngày phép.");
+    if (leaveDate < todayDateKey) {
+      setMessage("Chỉ được chọn ngày nghỉ từ hôm nay trở đi.");
+      return;
+    }
+    if (staff.leaveCredit < leaveSessionCreditCost(typeLeave)) {
+      setMessage("Nhân viên không đủ ngày phép cho lựa chọn này.");
       return;
     }
     if (hasExistingRequestForDate(requests, staff.id, leaveDate)) {
@@ -48,8 +60,9 @@ export function StaffWorkspace({
     }
 
     try {
-      await onSubmit(staff.id, leaveDate, reason.trim());
+      await onSubmit(staff.id, leaveDate, typeLeave, reason.trim());
       setLeaveDate("");
+      setTypeLeave("FULL");
       setReason("");
       setMessage("Đã gửi đơn cho HEAD duyệt.");
     } catch (error) {
@@ -61,8 +74,8 @@ export function StaffWorkspace({
     <div className="grid gap-4 lg:grid-cols-[minmax(280px,360px)_1fr]">
       <section className="rounded-md border border-slate-200 bg-white p-4">
         <SectionHeader
-          title="Staff gửi đơn"
-          description="Giao diện theo dữ liệu backend (staffs và leave_requests)."
+          title="Nhân viên gửi đơn"
+          description="Giao diện theo dữ liệu máy chủ."
         />
         <div className="mb-4 rounded-md border border-slate-200 bg-slate-50 p-3 text-sm">
           <p className="font-medium text-slate-950">{staff.fullName}</p>
@@ -74,11 +87,27 @@ export function StaffWorkspace({
             Ngày nghỉ
             <input
               className={inputClassName}
-              lang="en-GB"
+              lang="vi-VN"
+              min={todayDateKey}
               onChange={(event) => setLeaveDate(event.target.value)}
               type="date"
               value={leaveDate}
             />
+          </label>
+          <label className="grid gap-1 text-sm font-medium text-slate-700">
+            Buổi nghỉ
+            <select
+              className={inputClassName}
+              name="type_leave"
+              onChange={(event) => setTypeLeave(event.target.value as LeaveSession)}
+              value={typeLeave}
+            >
+              {leaveSessionOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </label>
           <label className="grid gap-1 text-sm font-medium text-slate-700">
             Lý do
@@ -102,6 +131,8 @@ export function StaffWorkspace({
 
       <RequestTable
         calendarRequests={requests}
+        minSelectableDate={todayDateKey}
+        onDateSelect={setLeaveDate}
         onRequestClick={onViewRequest}
         pagination={
           requestsMeta
@@ -121,6 +152,13 @@ export function StaffWorkspace({
   );
 }
 
+function getTodayDateKey() {
+  const date = new Date();
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
+    date.getDate(),
+  ).padStart(2, "0")}`;
+}
+
 const inputClassName =
   "rounded-md border border-slate-300 px-3 py-2 text-sm font-normal outline-none focus:border-sky-500";
 
@@ -130,6 +168,8 @@ function hasExistingRequestForDate(
   leaveDate: string,
 ) {
   return requests.some(
-    (request) => request.staffId === staffId && request.leaveDate === leaveDate,
+    (request) =>
+      request.staffId === staffId &&
+      request.leaveDate === leaveDate,
   );
 }

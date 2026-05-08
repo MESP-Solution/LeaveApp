@@ -1,10 +1,7 @@
 import { formatDateTime, leaveStatusLabel } from "@/lib/formatters";
 import { findStaffName } from "@/lib/leave-app-helpers";
 import type { LeaveRequestPaginationMeta } from "@/lib/leave-requests-api";
-import type {
-  LeaveRequestRecord,
-  StaffRecord,
-} from "@/types/leave-app";
+import type { LeaveRequestRecord, StaffRecord } from "@/types/leave-app";
 import { EmptyState } from "./empty-state";
 import { RequestTable } from "./request-table";
 import { SectionHeader } from "./section-header";
@@ -40,7 +37,7 @@ export function ManagerWorkspace({
         {processedByManager.length === 0 ? (
           <EmptyState
             title="Chưa có đơn đã xử lý"
-            description="Các đơn APPROVED/REJECTED bởi bạn sẽ hiển thị tại đây."
+            description="Các đơn đã duyệt hoặc từ chối bởi bạn sẽ hiển thị tại đây."
           />
         ) : (
           <div className="grid gap-3">
@@ -59,11 +56,13 @@ export function ManagerWorkspace({
                       Nhân viên: {findStaffName(staffs, request.staffId)}
                     </p>
                     {request.status === "REJECTED" && request.rejectReason ? (
-                      <p className="mt-2 text-sm text-rose-700">Lý do từ chối: {request.rejectReason}</p>
+                      <p className="mt-2 text-sm text-rose-700">
+                        Lý do từ chối: {request.rejectReason}
+                      </p>
                     ) : null}
                   </div>
                   <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700">
-                    {request.status}
+                    {leaveStatusLabel(request.status)}
                   </span>
                 </div>
               </div>

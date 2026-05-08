@@ -1,4 +1,5 @@
 import type { ErdLeaveStatus, StaffRecord, StaffRoleName, LeaveRequestRecord } from "@/types/leave-app";
+import { normalizeLeaveSession } from "./leave-session";
 
 type StaffApiDto = {
   id: number;
@@ -13,6 +14,7 @@ type LeaveRequestApiDto = {
   id: number;
   staffId: number;
   leaveDate: string;
+  type?: string;
   reason: string;
   status: "pending" | "approved" | "rejected";
   rejectReason?: string;
@@ -38,6 +40,7 @@ export function mapLeaveRequestFromApi(dto: LeaveRequestApiDto): LeaveRequestRec
     id: dto.id,
     staffId: dto.staffId,
     leaveDate: dto.leaveDate,
+    type_leave: normalizeLeaveSession(dto.type),
     reason: dto.reason,
     status: mapLeaveStatus(dto.status),
     resolvedBy: dto.resolvedByStaffId,
