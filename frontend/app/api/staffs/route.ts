@@ -32,7 +32,7 @@ async function proxyRequest(
     const payload = await response.json().catch(() => ({}));
     return NextResponse.json(payload, { status: response.status });
   } catch {
-    return NextResponse.json({ message: "Không kết nối được backend." }, { status: 503 });
+    return NextResponse.json({ message: "Không kết nối được máy chủ." }, { status: 503 });
   }
 }
 

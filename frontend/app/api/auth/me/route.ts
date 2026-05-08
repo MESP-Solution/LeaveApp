@@ -41,7 +41,7 @@ export async function GET() {
     return NextResponse.json({ staff: unwrapApiResponse(backendPayload) });
   } catch {
     return NextResponse.json(
-      { message: "Khong ket noi duoc backend xac thuc." },
+      { message: "Không kết nối được máy chủ xác thực." },
       { status: 503 },
     );
   }

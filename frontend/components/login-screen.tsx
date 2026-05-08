@@ -42,17 +42,8 @@ export function LoginScreen({
   }
 
   return (
-    <div className="mx-auto grid max-w-5xl gap-6 lg:grid-cols-[1fr_420px]">
-      <section className="rounded-md border border-slate-200 bg-white p-5">
-        <p className="text-sm font-medium text-slate-500">Đăng nhập API</p>
-        <h2 className="mt-2 text-2xl font-semibold text-slate-950">
-          Đăng nhập LeaveManagement
-        </h2>
-        <p className="mt-3 text-sm leading-6 text-slate-600">
-          Nhập tài khoản đã tồn tại trong bảng `staffs`. Sau khi đăng nhập thành
-          công, giao diện sẽ điều hướng dashboard theo role thật trả về từ backend.
-        </p>
-      </section>
+    <div className="flex w-full items-center justify-center bg-slate-50 p-6 lg:grid-cols-[1fr_420px]">
+      
 
       <section className="rounded-md border border-slate-200 bg-white p-5">
         <h3 className="text-base font-semibold text-slate-950">Thông tin đăng nhập</h3>

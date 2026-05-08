@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { useCallback, useEffect, useState } from "react";
 import { getCurrentStaff } from "@/lib/auth-api";
 import { formatDate, formatDateTime, leaveStatusLabel } from "@/lib/formatters";
@@ -11,8 +11,9 @@ import {
   type LeaveRequestPaginationMeta,
 } from "@/lib/leave-requests-api";
 import { findRoleName } from "@/lib/leave-app-helpers";
+import { leaveSessionLabel } from "@/lib/leave-session";
 import { createStaff, deleteStaff, fetchAllStaffs, fetchStaffsPage } from "@/lib/staff-api";
-import type { LeaveRequestRecord, StaffRecord } from "@/types/leave-app";
+import type { LeaveRequestRecord, LeaveSession, StaffRecord } from "@/types/leave-app";
 import { AdminWorkspace } from "./admin-workspace";
 import { LoginScreen } from "./login-screen";
 import { Metrics } from "./metrics";
@@ -64,7 +65,7 @@ export function LeaveDashboard() {
       setRequestsPage(paged.requests);
       setRequestsPageMeta(paged.meta);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Không tải được dữ liệu backend.");
+      setMessage(error instanceof Error ? error.message : "Không tải được dữ liệu từ máy chủ.");
     } finally {
       setIsLoadingData(false);
     }
@@ -123,7 +124,7 @@ export function LeaveDashboard() {
       } catch (error) {
         if (isActive) {
           setMessage(
-            error instanceof Error ? error.message : "Khong the khoi phuc phien dang nhap.",
+            error instanceof Error ? error.message : "Không thể khôi phục phiên đăng nhập.",
           );
         }
       } finally {
@@ -141,7 +142,7 @@ export function LeaveDashboard() {
   if (isRestoringSession) {
     return (
       <div className="rounded-md border border-slate-200 bg-white p-5 text-sm text-slate-600">
-        Dang khoi phuc phien dang nhap...
+        Đang khôi phục phiên đăng nhập...
       </div>
     );
   }
@@ -150,10 +151,16 @@ export function LeaveDashboard() {
     return <LoginScreen onLogin={handleLogin} />;
   }
 
-  async function handleSubmit(staffId: number, leaveDate: string, reason: string) {
-    await createLeaveRequest({ staffId, leaveDate, reason });
+  async function handleSubmit(
+    staffId: number,
+    leaveDate: string,
+    type_leave: LeaveSession,
+    reason: string,
+  ) {
+    const createdRequests = await createLeaveRequest({ staffId, leaveDate, type_leave, reason });
     if (currentUser) {
       await reloadData(currentUser);
+      mergeCreatedRequests(createdRequests);
     }
   }
 
@@ -184,7 +191,7 @@ export function LeaveDashboard() {
       {message ? <p className="text-sm text-rose-700">{message}</p> : null}
 
       {currentRole !== "STAFF" ? <Metrics requests={requests} staffs={staffs} /> : null}
-      {isLoadingData ? <p className="text-sm text-slate-600">Đang tải dữ liệu từ backend...</p> : null}
+      {isLoadingData ? <p className="text-sm text-slate-600">Đang tải dữ liệu từ máy chủ...</p> : null}
 
       {currentRole === "STAFF" ? (
         <StaffWorkspace
@@ -236,6 +243,7 @@ export function LeaveDashboard() {
               <div className="grid gap-2 text-sm">
                 <DetailRow label="Nhân viên" value={findStaffNameById(staffs, selectedRequest.staffId)} />
                 <DetailRow label="Ngày nghỉ" value={formatDate(selectedRequest.leaveDate)} />
+                <DetailRow label="Buổi nghỉ" value={leaveSessionLabel(selectedRequest.type_leave)} />
                 <DetailRow label="Lý do" value={selectedRequest.reason} />
                 <DetailRow label="Trạng thái" value={leaveStatusLabel(selectedRequest.status)} />
                 <DetailRow label="Xử lý bởi" value={findStaffNameById(staffs, selectedRequest.resolvedBy)} />
@@ -317,6 +325,11 @@ export function LeaveDashboard() {
     );
   }
 
+  function mergeCreatedRequests(createdRequests: LeaveRequestRecord[]) {
+    setRequests((current) => mergeRequestsById(current, createdRequests));
+    setRequestsPage((current) => mergeRequestsById(current, createdRequests));
+  }
+
   function openRequestDetail(request: LeaveRequestRecord) {
     setSelectedRequestId(request.id);
     setRejectNote("");
@@ -353,6 +366,20 @@ export function LeaveDashboard() {
 function findStaffNameById(staffs: StaffRecord[], staffId?: number): string {
   if (!staffId) return "-";
   return staffs.find((staff) => staff.id === staffId)?.fullName ?? "-";
+}
+
+function mergeRequestsById(
+  requests: LeaveRequestRecord[],
+  nextRequests: LeaveRequestRecord[],
+): LeaveRequestRecord[] {
+  if (nextRequests.length === 0) {
+    return requests;
+  }
+
+  return requests.map((request) => {
+    const nextRequest = nextRequests.find((item) => item.id === request.id);
+    return nextRequest ? { ...request, ...nextRequest } : request;
+  });
 }
 
 function DetailRow({ label, value }: { label: string; value: string }) {

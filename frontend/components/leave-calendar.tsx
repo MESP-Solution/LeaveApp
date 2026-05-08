@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import { formatDate, formatMonth, leaveStatusLabel } from "@/lib/formatters";
 import { findStaffName } from "@/lib/leave-app-helpers";
+import { leaveSessionLabel } from "@/lib/leave-session";
 import type { LeaveRequestRecord, StaffRecord } from "@/types/leave-app";
 import { EmptyState } from "./empty-state";
 
@@ -25,11 +26,15 @@ export function LeaveCalendar({
   requests,
   staffs,
   controls,
+  minSelectableDate,
+  onDateSelect,
   onRequestClick,
 }: {
+  minSelectableDate?: string;
   requests: LeaveRequestRecord[];
   staffs: StaffRecord[];
   controls?: ReactNode;
+  onDateSelect?: (dateKey: string) => void;
   onRequestClick?: (request: LeaveRequestRecord) => void;
 }) {
   const firstRequestDate = requests[0]?.leaveDate ?? new Date().toISOString();
@@ -42,7 +47,12 @@ export function LeaveCalendar({
   const selectedRequests = requestsByDate.get(selectedDate) ?? [];
 
   if (requests.length === 0) {
-    return <EmptyState title="Chưa có lịch nghỉ" description="Khi có đơn, lịch theo ngày sẽ hiển thị ở đây." />;
+    return (
+      <EmptyState
+        title="Chưa có lịch nghỉ"
+        description="Khi có đơn, lịch theo ngày sẽ hiển thị ở đây."
+      />
+    );
   }
 
   return (
@@ -87,6 +97,7 @@ export function LeaveCalendar({
         {calendarDays.map((day) => {
           const dayRequests = requestsByDate.get(day.dateKey) ?? [];
           const isSelected = selectedDate === day.dateKey;
+          const isPastSelectableDate = Boolean(minSelectableDate && day.dateKey < minSelectableDate);
 
           return (
             <button
@@ -94,9 +105,16 @@ export function LeaveCalendar({
                 "min-h-20 rounded-md border p-2 text-left text-xs transition-colors",
                 day.inMonth ? "bg-white text-slate-950" : "bg-slate-50 text-slate-400",
                 isSelected ? "border-sky-400 ring-2 ring-sky-100" : "border-slate-200",
+                isPastSelectableDate ? "cursor-not-allowed opacity-60" : "hover:bg-slate-50",
               ].join(" ")}
               key={day.dateKey}
-              onClick={() => setSelectedDate(day.dateKey)}
+              onClick={() => {
+                setSelectedDate(day.dateKey);
+                if (!isPastSelectableDate) {
+                  onDateSelect?.(day.dateKey);
+                }
+              }}
+              title={isPastSelectableDate ? "Chỉ được chọn ngày nghỉ từ hôm nay trở đi" : undefined}
               type="button"
             >
               <span className="font-medium">{day.dayNumber}</span>
@@ -138,6 +156,9 @@ export function LeaveCalendar({
                     {leaveStatusLabel(request.status)}
                   </span>
                 </div>
+                <p className="mt-1 text-xs font-medium text-slate-500">
+                  {leaveSessionLabel(request.type_leave)}
+                </p>
                 <p className="mt-1 text-slate-600">{request.reason}</p>
               </button>
             ))}

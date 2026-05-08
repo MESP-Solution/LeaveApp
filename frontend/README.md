@@ -8,7 +8,7 @@ Frontend Next.js cho quy trình xin nghỉ phép LeaveApp.
 - Điều hướng dashboard theo role thật backend trả về: `STAFF`, `HEAD`, `MANAGER`, hoặc `ADMIN`.
 - JWT được lưu bằng `HttpOnly` cookie tên `access_token` qua Next API route, không lưu trong `localStorage`.
 - Tải lại trang sẽ gọi `/api/auth/me` để khôi phục phiên đăng nhập từ cookie.
-- Các màn dashboard sau đăng nhập vẫn đang dùng dữ liệu mock/local state. Lần này chỉ nối phần đăng nhập.
+- Các màn dashboard sau đăng nhập dùng API thật từ backend.
 
 ## Cấu hình API
 

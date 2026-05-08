@@ -129,8 +129,8 @@ export function AdminWorkspace({
     <div className="grid gap-4 lg:grid-cols-[minmax(300px,430px)_1fr] lg:items-stretch">
       <section className="flex min-h-0 flex-col rounded-md border border-slate-200 bg-white p-4">
         <SectionHeader
-          title="Dashboard Admin"
-          description="Quản lý tài khoản và vai trò từ backend."
+          title="Quản trị nhân sự"
+          description="Quản lý tài khoản và vai trò từ dữ liệu máy chủ."
         />
         <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 p-3">
           <p className="text-sm text-slate-600">
@@ -233,56 +233,76 @@ export function AdminWorkspace({
                 Đóng
               </button>
             </div>
-            <form className="mt-4 grid gap-2" onSubmit={handleCreateStaff}>
-              <input
-                className={inputClassName}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, fullName: event.target.value }))
-                }
-                placeholder="Họ tên"
-                value={form.fullName}
-              />
-              <input
-                className={inputClassName}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, email: event.target.value }))
-                }
-                placeholder="Email"
-                type="email"
-                value={form.email}
-              />
-              <input
-                className={inputClassName}
-                onChange={(event) =>
-                  setForm((current) => ({ ...current, password: event.target.value }))
-                }
-                placeholder="Mật khẩu (>=8 ký tự)"
-                type="password"
-                value={form.password}
-              />
-              <div className="grid grid-cols-2 gap-2">
-                <select
-                  className={inputClassName}
-                  onChange={(event) =>
-                    setForm((current) => ({ ...current, roleId: Number(event.target.value) }))
-                  }
-                  value={form.roleId}
-                >
-                  {roleOptions.map((option) => (
-                    <option key={option.value} disabled={option.disabled} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
+            <form className="mt-4 grid gap-3" onSubmit={handleCreateStaff}>
+              <label className={fieldLabelClassName}>
+                Họ tên
                 <input
                   className={inputClassName}
-                  min={1}
                   onChange={(event) =>
-                    setForm((current) => ({ ...current, leaveCredit: Number(event.target.value) }))
+                    setForm((current) => ({ ...current, fullName: event.target.value }))
                   }
-                  type="number"
-                  value={form.leaveCredit}
+                  placeholder="Nhập họ tên nhân sự"
+                  title="Họ tên nhân sự"
+                  value={form.fullName}
                 />
+              </label>
+              <label className={fieldLabelClassName}>
+                Email
+                <input
+                  className={inputClassName}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, email: event.target.value }))
+                  }
+                  placeholder="Nhập email đăng nhập"
+                  title="Email đăng nhập"
+                  type="email"
+                  value={form.email}
+                />
+              </label>
+              <label className={fieldLabelClassName}>
+                Mật khẩu
+                <input
+                  className={inputClassName}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, password: event.target.value }))
+                  }
+                  placeholder="Tối thiểu 8 ký tự"
+                  title="Mật khẩu đăng nhập"
+                  type="password"
+                  value={form.password}
+                />
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <label className={fieldLabelClassName}>
+                  Vai trò
+                  <select
+                    className={inputClassName}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, roleId: Number(event.target.value) }))
+                    }
+                    title="Vai trò của nhân sự"
+                    value={form.roleId}
+                  >
+                    {roleOptions.map((option) => (
+                      <option key={option.value} disabled={option.disabled} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className={fieldLabelClassName}>
+                  Ngày phép
+                  <input
+                    className={inputClassName}
+                    min={1}
+                    onChange={(event) =>
+                      setForm((current) => ({ ...current, leaveCredit: Number(event.target.value) }))
+                    }
+                    title="Số ngày phép ban đầu"
+                    type="number"
+                    value={form.leaveCredit}
+                  />
+                </label>
               </div>
               <button
                 className="mt-2 rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:bg-slate-400"
@@ -302,7 +322,7 @@ export function AdminWorkspace({
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="text-lg font-semibold text-slate-950">Thông tin nhân sự</h3>
-                <p className="mt-1 text-sm text-slate-600">Chi tiết từ backend.</p>
+                <p className="mt-1 text-sm text-slate-600">Chi tiết từ dữ liệu máy chủ.</p>
               </div>
               <button
                 className="rounded-md border border-slate-300 bg-white px-3 py-1 text-sm font-medium text-slate-700"
@@ -326,7 +346,7 @@ export function AdminWorkspace({
                 </div>
                 <div className="grid grid-cols-2 gap-2">
                   <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                    <p className="text-slate-500">Role</p>
+                    <p className="text-slate-500">Vai trò</p>
                     <p className="font-medium text-slate-950">{findRoleName(selectedStaff)}</p>
                   </div>
                   <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
@@ -335,11 +355,11 @@ export function AdminWorkspace({
                   </div>
                 </div>
                 <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-slate-500">ID</p>
+                  <p className="text-slate-500">Mã nhân sự</p>
                   <p className="font-medium text-slate-950">{selectedStaff.id}</p>
                 </div>
                 <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-slate-500">CreatedAt</p>
+                  <p className="text-slate-500">Ngày tạo</p>
                   <p className="font-medium text-slate-950">{selectedStaff.createdAt}</p>
                 </div>
               </div>
@@ -352,8 +372,10 @@ export function AdminWorkspace({
     </div>
   );
 }
+
 const inputClassName =
   "rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-sky-500";
+const fieldLabelClassName = "grid gap-1 text-sm font-medium text-slate-700";
 
 const modalOverlayClassName =
   "fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4";
