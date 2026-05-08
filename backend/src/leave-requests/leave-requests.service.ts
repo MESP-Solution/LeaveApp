@@ -62,7 +62,14 @@ export class LeaveRequestsService {
     this.logger.log(
       `Created leave request for staffId=${staff.id} (${staff.email}) leaveDate=${dto.leaveDate} type=${leaveRequest.type}`,
     );
-    await this.notifyApprovers(leaveRequest, staff.email, staff.smtpPass);
+    void this.notifyApprovers(leaveRequest, staff.email, staff.smtpPass).catch(
+      (error) => {
+        this.logger.error(
+          `Failed to notify approvers for leaveRequestId=${leaveRequest.id}`,
+          (error as Error)?.stack,
+        );
+      },
+    );
 
     return {
       totalDays: this.getTypeWeight(leaveRequest.type),
