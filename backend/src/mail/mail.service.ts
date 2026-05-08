@@ -1,77 +1,86 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Transporter, createTransport } from 'nodemailer';
-import { MailMessage } from './mail.types';
+import { MailMessage, MailSenderCredentials } from './mail.types';
 
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
-  private readonly transporter: Transporter | null;
-  private readonly from: string | null;
-  private hasLoggedMissingSmtpConfig = false;
-  private hasLoggedMissingFrom = false;
+  private readonly smtpHost: string | null;
+  private readonly smtpPort: number | null;
+  private readonly smtpSecure: boolean;
+  private hasLoggedMissingSmtpHostConfig = false;
+  private hasLoggedInvalidSmtpPort = false;
 
   constructor(private readonly configService: ConfigService) {
-    const configuredFrom = this.configService.get<string>('MAIL_FROM')?.trim();
-    const smtpUser = this.configService.get<string>('SMTP_USER')?.trim();
-    this.from = configuredFrom || smtpUser || null;
-    if (!configuredFrom && this.from) {
-      this.logger.warn(
-        'MAIL_FROM missing; using SMTP_USER as from address fallback',
-      );
-    }
-    this.transporter = this.createSmtpTransporter();
+    this.smtpHost = this.configService.get<string>('SMTP_HOST')?.trim() ?? null;
+    const portValue = this.configService.get<string>('SMTP_PORT')?.trim();
+    const parsedPort = Number(portValue);
+    this.smtpPort =
+      Number.isFinite(parsedPort) && parsedPort > 0 ? parsedPort : null;
+    const secureValue = this.configService
+      .get<string>('SMTP_SECURE')
+      ?.trim()
+      .toLowerCase();
+    this.smtpSecure = secureValue === 'true';
   }
 
-  async send(message: MailMessage): Promise<void> {
-    if (!this.transporter) {
-      if (!this.hasLoggedMissingSmtpConfig) {
+  async send(
+    message: MailMessage,
+    sender: MailSenderCredentials,
+  ): Promise<void> {
+    if (!this.smtpHost) {
+      if (!this.hasLoggedMissingSmtpHostConfig) {
         this.logger.warn(
-          'SMTP config missing; skipping all outgoing email until configured',
+          'SMTP_HOST missing; skipping all outgoing email until configured',
         );
-        this.hasLoggedMissingSmtpConfig = true;
-      }
-      return;
-    }
-    if (!this.from) {
-      if (!this.hasLoggedMissingFrom) {
-        this.logger.warn(
-          'MAIL_FROM missing and no SMTP_USER fallback; skipping outgoing email',
-        );
-        this.hasLoggedMissingFrom = true;
+        this.hasLoggedMissingSmtpHostConfig = true;
       }
       return;
     }
 
+    if (!this.smtpPort) {
+      if (!this.hasLoggedInvalidSmtpPort) {
+        this.logger.warn(
+          'SMTP_PORT invalid; skipping all outgoing email until fixed',
+        );
+        this.hasLoggedInvalidSmtpPort = true;
+      }
+      return;
+    }
+
+    const smtpUser = sender.smtpUser?.trim();
+    const smtpPass = sender.smtpPass?.trim();
+    if (!smtpUser || !smtpPass) {
+      this.logger.warn(
+        'Sender SMTP credentials missing; skipping outgoing email for this request',
+      );
+      return;
+    }
+
+    const from = sender.from?.trim() || smtpUser;
+    const transporter = this.createSmtpTransporter(
+      this.smtpHost,
+      this.smtpPort,
+      this.smtpSecure,
+      smtpUser,
+      smtpPass,
+    );
     const toList = Array.isArray(message.to) ? message.to : [message.to];
     this.logger.debug(
       `Sending email via SMTP to=${toList.join(',')} subject="${message.subject}"`,
     );
 
-    await this.sendViaSmtp(message, toList, this.from);
+    await this.sendViaSmtp(transporter, message, toList, from);
   }
 
-  private createSmtpTransporter(): Transporter | null {
-    const host = this.configService.get<string>('SMTP_HOST')?.trim();
-    const portValue = this.configService.get<string>('SMTP_PORT')?.trim();
-    const user = this.configService.get<string>('SMTP_USER')?.trim();
-    const pass = this.configService.get<string>('SMTP_PASS')?.trim();
-    const secureValue = this.configService
-      .get<string>('SMTP_SECURE')
-      ?.trim()
-      .toLowerCase();
-    const secure = secureValue === 'true';
-
-    if (!host || !portValue || !user || !pass) {
-      return null;
-    }
-
-    const port = Number(portValue);
-    if (!Number.isFinite(port) || port <= 0) {
-      this.logger.warn(`SMTP_PORT invalid ("${portValue}"), skipping SMTP setup`);
-      return null;
-    }
-
+  private createSmtpTransporter(
+    host: string,
+    port: number,
+    secure: boolean,
+    user: string,
+    pass: string,
+  ): Transporter {
     return createTransport({
       host,
       port,
@@ -84,12 +93,13 @@ export class MailService {
   }
 
   private async sendViaSmtp(
+    transporter: Transporter,
     message: MailMessage,
     toList: string[],
     from: string,
   ): Promise<void> {
     try {
-      const info = await this.transporter!.sendMail({
+      const info = await transporter.sendMail({
         from,
         to: message.to,
         subject: message.subject,

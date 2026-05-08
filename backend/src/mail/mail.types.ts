@@ -4,3 +4,9 @@ export type MailMessage = {
   text: string;
   html?: string;
 };
+
+export type MailSenderCredentials = {
+  smtpUser: string;
+  smtpPass: string;
+  from?: string;
+};

@@ -37,10 +37,9 @@ Thiết lập SMTP (để gửi email thật):
 SMTP_HOST=smtp.yourprovider.com
 SMTP_PORT=587
 SMTP_SECURE=false
-SMTP_USER=your-user
-SMTP_PASS=your-password
-MAIL_FROM="Leave App <no-reply@yourdomain.com>"
 ```
+
+Lưu ý: hệ thống dùng `email` + `smtpPass` của từng staff làm tài khoản gửi mail (không dùng `SMTP_USER`/`SMTP_PASS` trong `.env` nữa).
 
 Chạy migration để tạo bảng thật và seed role mặc định `STAFF`, `MANAGER`, `HEAD`, `ADMIN`:
 

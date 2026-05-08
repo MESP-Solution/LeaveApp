@@ -14,6 +14,7 @@ describe('LeaveRequestsService', () => {
   let leaveRequestsService: LeaveRequestsService;
   let nextId: number;
   let staffsService: Pick<StaffsService, 'findByRoleName' | 'findEntityById'>;
+  let mailService: Pick<MailService, 'send'>;
 
   beforeEach(() => {
     dbRequests = [];
@@ -95,12 +96,14 @@ describe('LeaveRequestsService', () => {
       ),
     };
 
+    mailService = {
+      send: jest.fn().mockResolvedValue(undefined),
+    };
+
     leaveRequestsService = new LeaveRequestsService(
       leaveRequestRepository as EntityRepository<DbLeaveRequest>,
       staffsService as StaffsService,
-      {
-        send: jest.fn().mockResolvedValue(undefined),
-      } as unknown as MailService,
+      mailService as MailService,
     );
   });
 
@@ -128,6 +131,20 @@ describe('LeaveRequestsService', () => {
 
     expect(created.totalDays).toBe(0.5);
     expect(created.requests[0].type).toBe(TypeLeave.MORNING);
+  });
+
+  it('creates leave request without waiting for approver notification', async () => {
+    (mailService.send as jest.Mock).mockRejectedValueOnce(new Error('SMTP down'));
+
+    const created = await leaveRequestsService.create({
+      leaveDate: '2026-05-06',
+      reason: 'Doctor appointment',
+      staffId: 1,
+      type: TypeLeave.FULL,
+    });
+
+    expect(created.totalDays).toBe(1);
+    expect(created.requests[0].status).toBe('pending');
   });
 
   it('prevents duplicate leave requests on the same date', async () => {

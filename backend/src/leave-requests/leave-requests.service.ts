@@ -62,7 +62,14 @@ export class LeaveRequestsService {
     this.logger.log(
       `Created leave request for staffId=${staff.id} (${staff.email}) leaveDate=${dto.leaveDate} type=${leaveRequest.type}`,
     );
-    await this.notifyApprovers(leaveRequest);
+    void this.notifyApprovers(leaveRequest, staff.email, staff.smtpPass).catch(
+      (error) => {
+        this.logger.error(
+          `Failed to notify approvers for leaveRequestId=${leaveRequest.id}`,
+          (error as Error)?.stack,
+        );
+      },
+    );
 
     return {
       totalDays: this.getTypeWeight(leaveRequest.type),
@@ -166,11 +173,17 @@ export class LeaveRequestsService {
     this.logger.log(
       `Processed leaveRequestId=${leaveRequest.id} status=${status} resolverStaffId=${resolverStaff.id} staffId=${leaveRequest.staff.id}`,
     );
-    await this.mailService.send({
-      to: leaveRequest.staff.email,
-      subject: `Leave request ${status}`,
-      text: `Your leave request ${leaveRequest.id} was ${status}.`,
-    });
+    await this.mailService.send(
+      {
+        to: leaveRequest.staff.email,
+        subject: `Leave request ${status}`,
+        text: `Your leave request ${leaveRequest.id} was ${status}.`,
+      },
+      {
+        smtpUser: resolverStaff.email,
+        smtpPass: resolverStaff.smtpPass,
+      },
+    );
 
     return this.toResponse(leaveRequest);
   }
@@ -202,7 +215,11 @@ export class LeaveRequestsService {
     }
   }
 
-  private async notifyApprovers(leaveRequest: DbLeaveRequest): Promise<void> {
+  private async notifyApprovers(
+    leaveRequest: DbLeaveRequest,
+    senderEmail: string,
+    senderSmtpPass: string,
+  ): Promise<void> {
     const [heads, managers] = await Promise.all([
       this.staffsService.findByRoleName('HEAD'),
       this.staffsService.findByRoleName('MANAGER'),
@@ -218,11 +235,12 @@ export class LeaveRequestsService {
 
     await Promise.all(
       uniqueRecipients.map((email) =>
-        this.mailService.send({
-          to: email,
-          subject: `📌 Leave Request Pending Approval`,
-          text: `A new leave request is waiting for approval.`,
-          html: `
+        this.mailService.send(
+          {
+            to: email,
+            subject: `📌 Leave Request Pending Approval`,
+            text: `A new leave request is waiting for approval.`,
+            html: `
             <div style="
               font-family: Arial, sans-serif;
               background-color: #f4f6f9;
@@ -288,7 +306,12 @@ export class LeaveRequestsService {
               </div>
             </div>
           `,
-        }),
+          },
+          {
+            smtpUser: senderEmail,
+            smtpPass: senderSmtpPass,
+          },
+        ),
       ),
     );
   }
