@@ -1,10 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import {
+  IsNumber,
   IsEmail,
   IsInt,
   IsOptional,
   IsString,
-  Max,
   Min,
   MinLength,
 } from 'class-validator';
@@ -23,6 +23,11 @@ export class CreateStaffDto {
   @MinLength(8)
   password!: string;
 
+  @ApiProperty({ example: 'smtp-app-password-1234' })
+  @IsString()
+  @MinLength(8)
+  smtpPass!: string;
+
   @ApiPropertyOptional({
     example: 1,
     description: 'Role id. Defaults to STAFF.',
@@ -34,8 +39,7 @@ export class CreateStaffDto {
 
   @ApiPropertyOptional({ example: 12, default: 12 })
   @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Max(365)
+  @IsNumber({ maxDecimalPlaces: 2 })
+  @Min(0)
   leaveCredit?: number;
 }

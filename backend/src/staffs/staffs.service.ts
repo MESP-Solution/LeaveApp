@@ -94,6 +94,7 @@ export class StaffsService {
     creator: AuthenticatedStaff,
   ): Promise<StaffResponseDto> {
     await this.ensureEmailUnique(dto.email);
+    await this.ensureSmtpPassUnique(dto.smtpPass);
     const role = await this.resolveRole(dto.roleId);
     await this.assertCanCreateRole(creator.role, role.name);
 
@@ -103,6 +104,7 @@ export class StaffsService {
       fullName: dto.fullName.trim(),
       email: dto.email.toLowerCase(),
       passwordHash: await this.hashPassword(dto.password),
+      smtpPass: dto.smtpPass.trim(),
       role,
       leaveCredit: dto.leaveCredit ?? 12,
       createdBy: creatorEntity,
@@ -129,6 +131,11 @@ export class StaffsService {
 
     if (dto.password) {
       staff.passwordHash = await this.hashPassword(dto.password);
+    }
+
+    if (dto.smtpPass && dto.smtpPass !== staff.smtpPass) {
+      await this.ensureSmtpPassUnique(dto.smtpPass);
+      staff.smtpPass = dto.smtpPass.trim();
     }
 
     if (typeof dto.leaveCredit === 'number') {
@@ -195,6 +202,16 @@ export class StaffsService {
     }
   }
 
+  private async ensureSmtpPassUnique(smtpPass: string): Promise<void> {
+    const existingStaff = await this.staffRepository.findOne({
+      smtpPass: smtpPass.trim(),
+    });
+
+    if (existingStaff) {
+      throw new ConflictException('SMTP password already exists');
+    }
+  }
+
   private hashPassword(password: string): Promise<string> {
     return bcrypt.hash(password, 10);
   }
@@ -209,7 +226,7 @@ export class StaffsService {
       fullName: staff.fullName,
       email: staff.email,
       role: staff.role.name,
-      leaveCredit: staff.leaveCredit,
+      leaveCredit: Number(staff.leaveCredit),
       createdAt: staff.createdAt.toISOString(),
     };
   }

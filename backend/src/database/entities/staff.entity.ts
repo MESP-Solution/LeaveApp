@@ -23,13 +23,16 @@ export class Staff {
   @Property({ length: 255, hidden: true })
   passwordHash!: string;
 
+  @Property({ length: 255, unique: true, hidden: true })
+  smtpPass!: string;
+
   @ManyToOne(() => Role, {
     joinColumn: 'role_id',
     inversedBy: (role: Role) => role.staffs,
   })
   role!: Role;
 
-  @Property({ default: 12 })
+  @Property({ type: 'decimal', precision: 6, scale: 2, default: 12 })
   leaveCredit!: number;
 
   @ManyToOne(() => Staff, { nullable: true, joinColumn: 'created_by' })

@@ -74,6 +74,7 @@ async function createStaff(password: string): Promise<Staff> {
   staff.fullName = 'Nguyễn Văn An';
   staff.email = 'an@company.local';
   staff.passwordHash = await bcrypt.hash(password, 4);
+  staff.smtpPass = 'smtp-pass-1';
   staff.role = role;
   staff.leaveCredit = 12;
   staff.createdAt = new Date();

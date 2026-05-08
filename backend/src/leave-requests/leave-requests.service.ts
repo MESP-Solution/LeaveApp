@@ -8,6 +8,7 @@ import {
 } from '@nestjs/common';
 import { LeaveRequest as DbLeaveRequest } from '../database/entities/leave-request.entity';
 import { LeaveStatus } from '../database/enums/leave-status.enum';
+import { TypeLeave } from '../database/enums/type-leave.enum';
 import { MailService } from '../mail/mail.service';
 import { StaffsService } from '../staffs/staffs.service';
 import { PaginationMetaDto } from '../common/dto/success-response.dto';
@@ -38,46 +39,34 @@ export class LeaveRequestsService {
     if (!dto.reason?.trim()) {
       throw new BadRequestException('Leave reason is required');
     }
-    if (!this.isValidDate(dto.startDate) || !this.isValidDate(dto.endDate)) {
-      throw new BadRequestException('Start date or end date is invalid');
+    if (!this.isValidDate(dto.leaveDate)) {
+      throw new BadRequestException('Leave date is invalid');
+    }
+    if (this.isWeekendDate(dto.leaveDate)) {
+      throw new BadRequestException('Leave date must be a business day');
     }
 
-    const leaveDates = this.getBusinessDates(dto.startDate, dto.endDate);
-    if (leaveDates.length === 0) {
-      throw new BadRequestException(
-        'Leave range must include at least one business day',
-      );
-    }
+    await this.ensureNoDuplicateRequest(staff.id, dto.leaveDate);
+    const leaveRequest = this.leaveRequestRepository.create({
+      createdAt: new Date(),
+      leaveDate: dto.leaveDate,
+      reason: dto.reason.trim(),
+      staff,
+      status: LeaveStatus.PENDING,
+      type: dto.type ?? TypeLeave.FULL,
+      updatedAt: new Date(),
+    });
 
-    for (const leaveDate of leaveDates) {
-      await this.ensureNoDuplicateRequest(staff.id, leaveDate);
-    }
-
-    const leaveRequests = leaveDates.map((leaveDate) =>
-      this.leaveRequestRepository.create({
-        createdAt: new Date(),
-        leaveDate,
-        reason: dto.reason.trim(),
-        staff,
-        status: LeaveStatus.PENDING,
-        updatedAt: new Date(),
-      }),
-    );
-
-    await this.leaveRequestRepository
-      .getEntityManager()
-      .persistAndFlush(leaveRequests);
+    await this.leaveRequestRepository.getEntityManager().persistAndFlush(leaveRequest);
 
     this.logger.log(
-      `Created ${leaveRequests.length} leave request(s) for staffId=${staff.id} (${staff.email}) startDate=${dto.startDate} endDate=${dto.endDate}`,
+      `Created leave request for staffId=${staff.id} (${staff.email}) leaveDate=${dto.leaveDate} type=${leaveRequest.type}`,
     );
-    await Promise.all(
-      leaveRequests.map((request) => this.notifyApprovers(request)),
-    );
+    await this.notifyApprovers(leaveRequest);
 
     return {
-      totalDays: leaveRequests.length,
-      requests: leaveRequests.map((request) => this.toResponse(request)),
+      totalDays: this.getTypeWeight(leaveRequest.type),
+      requests: [this.toResponse(leaveRequest)],
     };
   }
 
@@ -167,7 +156,10 @@ export class LeaveRequestsService {
     leaveRequest.rejectReason =
       status === LeaveStatus.REJECTED ? dto.note?.trim() : undefined;
     if (status === LeaveStatus.APPROVED) {
-      leaveRequest.staff.leaveCredit -= 1;
+      leaveRequest.staff.leaveCredit = Number(
+        Number(leaveRequest.staff.leaveCredit) -
+          this.getTypeWeight(leaveRequest.type),
+      );
     }
 
     await this.leaveRequestRepository.getEntityManager().flush();
@@ -306,26 +298,21 @@ export class LeaveRequestsService {
     return !Number.isNaN(date.getTime());
   }
 
-  private getBusinessDates(startDate: string, endDate: string): string[] {
-    const start = new Date(`${startDate}T00:00:00.000Z`);
-    const end = new Date(`${endDate}T00:00:00.000Z`);
-    if (start > end) {
-      throw new BadRequestException(
-        'startDate must be before or equal to endDate',
-      );
-    }
+  private isWeekendDate(leaveDate: string): boolean {
+    const date = new Date(`${leaveDate}T00:00:00.000Z`);
+    const day = date.getUTCDay();
+    return day === 0 || day === 6;
+  }
 
-    const leaveDates: string[] = [];
-    const current = new Date(start);
-    while (current <= end) {
-      const day = current.getUTCDay();
-      if (day !== 0 && day !== 6) {
-        leaveDates.push(current.toISOString().slice(0, 10));
-      }
-      current.setUTCDate(current.getUTCDate() + 1);
+  private getTypeWeight(type: TypeLeave): number {
+    switch (type) {
+      case TypeLeave.MORNING:
+      case TypeLeave.AFTERNOON:
+        return 0.5;
+      case TypeLeave.FULL:
+      default:
+        return 1;
     }
-
-    return leaveDates;
   }
 
   private toDbStatus(status: LeaveRequestStatus): LeaveStatus {
@@ -357,7 +344,8 @@ export class LeaveRequestsService {
       id: leaveRequest.id,
       createdAt: leaveRequest.createdAt.toISOString(),
       leaveDate: leaveRequest.leaveDate,
-      reason: leaveRequest.reason ?? '',
+      reason: leaveRequest.reason,
+      type: leaveRequest.type,
       rejectReason: leaveRequest.rejectReason,
       processedAt: leaveRequest.resolvedAt?.toISOString(),
       resolvedByStaffId: leaveRequest.resolvedByStaff?.id,

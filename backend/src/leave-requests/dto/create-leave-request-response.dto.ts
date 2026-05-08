@@ -2,7 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { LeaveRequestResponseDto } from './leave-request-response.dto';
 
 export class CreateLeaveRequestResponseDto {
-  @ApiProperty({ example: 3 })
+  @ApiProperty({ example: 1 })
   totalDays!: number;
 
   @ApiProperty({

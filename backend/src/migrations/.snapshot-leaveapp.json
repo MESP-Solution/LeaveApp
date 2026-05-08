@@ -51,13 +51,33 @@
           "enumItems": [],
           "mappedType": "date"
         },
+        "type": {
+          "name": "type",
+          "type": "enum('MORNING','AFTERNOON','FULL')",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 9,
+          "precision": null,
+          "scale": null,
+          "default": "'FULL'",
+          "comment": null,
+          "enumItems": [
+            "MORNING",
+            "AFTERNOON",
+            "FULL"
+          ],
+          "mappedType": "enum"
+        },
         "reason": {
           "name": "reason",
           "type": "text",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
-          "nullable": true,
+          "nullable": false,
           "unique": false,
           "length": 65535,
           "precision": null,
@@ -351,6 +371,22 @@
           "enumItems": [],
           "mappedType": "string"
         },
+        "smtp_pass": {
+          "name": "smtp_pass",
+          "type": "varchar(255)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": true,
+          "length": 255,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
+        },
         "password_hash": {
           "name": "password_hash",
           "type": "varchar(255)",
@@ -385,19 +421,19 @@
         },
         "leave_credit": {
           "name": "leave_credit",
-          "type": "int",
+          "type": "decimal(6,2)",
           "unsigned": false,
           "autoincrement": false,
           "primary": false,
           "nullable": false,
           "unique": false,
           "length": null,
-          "precision": 10,
-          "scale": 0,
-          "default": "12",
+          "precision": 6,
+          "scale": 2,
+          "default": "12.00",
           "comment": null,
           "enumItems": [],
-          "mappedType": "integer"
+          "mappedType": "decimal"
         },
         "created_by": {
           "name": "created_by",
@@ -486,6 +522,15 @@
           "unique": false,
           "primary": false,
           "constraint": false
+        },
+        {
+          "columnNames": [
+            "smtp_pass"
+          ],
+          "keyName": "staffs_smtp_pass_unique",
+          "unique": true,
+          "primary": false,
+          "constraint": true
         }
       ],
       "checks": [],

@@ -154,6 +154,7 @@ function createStaff(id: number): Staff {
   staff.fullName = `Staff ${id}`;
   staff.email = `${id}@company.local`;
   staff.passwordHash = 'hashed';
+  staff.smtpPass = `smtp-pass-${id}`;
   staff.role = role;
   staff.leaveCredit = 12;
   staff.createdAt = new Date();

@@ -1,5 +1,6 @@
 import { Entity, Enum, ManyToOne, PrimaryKey, Property } from '@mikro-orm/core';
 import { LeaveStatus } from '../enums/leave-status.enum';
+import { TypeLeave } from '../enums/type-leave.enum';
 import { Staff } from './staff.entity';
 
 @Entity({ tableName: 'leave_requests' })
@@ -16,8 +17,11 @@ export class LeaveRequest {
   @Property({ type: 'date', columnType: 'date' })
   leaveDate!: string;
 
-  @Property({ type: 'text', nullable: true })
-  reason?: string;
+  @Enum({ items: () => TypeLeave, columnType: "enum('MORNING', 'AFTERNOON', 'FULL')" })
+  type: TypeLeave = TypeLeave.FULL;
+
+  @Property({ type: 'text' })
+  reason!: string;
 
   @Enum({ items: () => LeaveStatus })
   status: LeaveStatus = LeaveStatus.PENDING;

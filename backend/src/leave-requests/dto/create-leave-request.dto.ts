@@ -1,5 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsDateString, IsInt, IsString, Min } from 'class-validator';
+import { IsDateString, IsEnum, IsInt, IsString, Min } from 'class-validator';
+import { TypeLeave } from '../../database/enums/type-leave.enum';
 
 export class CreateLeaveRequestDto {
   @ApiProperty({ example: 1 })
@@ -9,11 +10,15 @@ export class CreateLeaveRequestDto {
 
   @ApiProperty({ example: '2026-05-04' })
   @IsDateString()
-  startDate!: string;
+  leaveDate!: string;
 
-  @ApiProperty({ example: '2026-05-06' })
-  @IsDateString()
-  endDate!: string;
+  @ApiProperty({
+    enum: TypeLeave,
+    example: TypeLeave.FULL,
+    default: TypeLeave.FULL,
+  })
+  @IsEnum(TypeLeave)
+  type: TypeLeave = TypeLeave.FULL;
 
   @ApiProperty({ example: 'Family trip' })
   @IsString()

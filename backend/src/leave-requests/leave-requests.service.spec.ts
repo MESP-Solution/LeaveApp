@@ -4,6 +4,7 @@ import { LeaveRequest as DbLeaveRequest } from '../database/entities/leave-reque
 import { Role } from '../database/entities/role.entity';
 import { Staff } from '../database/entities/staff.entity';
 import { LeaveStatus } from '../database/enums/leave-status.enum';
+import { TypeLeave } from '../database/enums/type-leave.enum';
 import { MailService } from '../mail/mail.service';
 import { StaffsService } from '../staffs/staffs.service';
 import { LeaveRequestsService } from './leave-requests.service';
@@ -105,10 +106,10 @@ describe('LeaveRequestsService', () => {
 
   it('creates a pending leave request for one date', async () => {
     const created = await leaveRequestsService.create({
-      startDate: '2026-05-04',
-      endDate: '2026-05-04',
+      leaveDate: '2026-05-04',
       reason: 'Family trip',
       staffId: 1,
+      type: TypeLeave.FULL,
     });
 
     expect(created.totalDays).toBe(1);
@@ -117,46 +118,42 @@ describe('LeaveRequestsService', () => {
     expect(created.requests[0].staffId).toBe(1);
   });
 
-  it('creates one request row per business day', async () => {
+  it('creates half-day leave request and returns decimal totalDays', async () => {
     const created = await leaveRequestsService.create({
-      startDate: '2026-05-04',
-      endDate: '2026-05-06',
+      leaveDate: '2026-05-05',
       reason: 'Family trip',
       staffId: 1,
+      type: TypeLeave.MORNING,
     });
 
-    expect(created.totalDays).toBe(3);
-    expect(created.requests.map((item) => item.leaveDate)).toEqual([
-      '2026-05-04',
-      '2026-05-05',
-      '2026-05-06',
-    ]);
+    expect(created.totalDays).toBe(0.5);
+    expect(created.requests[0].type).toBe(TypeLeave.MORNING);
   });
 
   it('prevents duplicate leave requests on the same date', async () => {
     await leaveRequestsService.create({
-      startDate: '2026-05-04',
-      endDate: '2026-05-04',
+      leaveDate: '2026-05-04',
       reason: 'Family trip',
       staffId: 1,
+      type: TypeLeave.FULL,
     });
 
     await expect(
       leaveRequestsService.create({
-        startDate: '2026-05-04',
-        endDate: '2026-05-04',
+        leaveDate: '2026-05-04',
         reason: 'Family trip',
         staffId: 1,
+        type: TypeLeave.FULL,
       }),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('allows heads to approve pending requests', async () => {
     const created = await leaveRequestsService.create({
-      startDate: '2026-05-04',
-      endDate: '2026-05-04',
+      leaveDate: '2026-05-04',
       reason: 'Personal work',
       staffId: 1,
+      type: TypeLeave.AFTERNOON,
     });
 
     const staff = await staffsService.findEntityById(1);
@@ -172,15 +169,15 @@ describe('LeaveRequestsService', () => {
 
     expect(approved.status).toBe('approved');
     expect(approved.resolvedByStaffId).toBe(2);
-    expect(staff.leaveCredit).toBe(11);
+    expect(staff.leaveCredit).toBe(11.5);
   });
 
   it('allows heads to reject pending requests', async () => {
     const created = await leaveRequestsService.create({
-      startDate: '2026-05-04',
-      endDate: '2026-05-04',
+      leaveDate: '2026-05-04',
       reason: 'Personal work',
       staffId: 1,
+      type: TypeLeave.FULL,
     });
 
     const rejected = await leaveRequestsService.reject(
@@ -197,10 +194,10 @@ describe('LeaveRequestsService', () => {
 
   it('rejects processing from regular staff', async () => {
     const created = await leaveRequestsService.create({
-      startDate: '2026-05-04',
-      endDate: '2026-05-04',
+      leaveDate: '2026-05-04',
       reason: 'Personal work',
       staffId: 1,
+      type: TypeLeave.FULL,
     });
 
     await expect(
@@ -210,10 +207,10 @@ describe('LeaveRequestsService', () => {
 
   it('rejects processing requests already handled', async () => {
     const created = await leaveRequestsService.create({
-      startDate: '2026-05-04',
-      endDate: '2026-05-04',
+      leaveDate: '2026-05-04',
       reason: 'Personal work',
       staffId: 1,
+      type: TypeLeave.FULL,
     });
 
     await leaveRequestsService.approve(created.requests[0].id, {}, 2);
@@ -246,6 +243,7 @@ function createMockStaff(
   staff.id = id;
   staff.fullName = fullName;
   staff.email = `${id}@company.local`;
+  staff.smtpPass = `smtp-pass-${id}`;
   staff.passwordHash = 'hashed-password';
   staff.role = role;
   staff.leaveCredit = 12;

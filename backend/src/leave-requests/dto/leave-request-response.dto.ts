@@ -3,6 +3,7 @@ import {
   LEAVE_REQUEST_STATUSES,
   type LeaveRequestStatus,
 } from '../leave-request.model';
+import { TypeLeave } from '../../database/enums/type-leave.enum';
 
 class LeaveRequestUserDto {
   @ApiProperty({ example: 1 })
@@ -36,6 +37,9 @@ export class LeaveRequestResponseDto {
 
   @ApiProperty({ example: '2026-05-04' })
   leaveDate!: string;
+
+  @ApiProperty({ enum: TypeLeave, example: TypeLeave.FULL })
+  type!: TypeLeave;
 
   @ApiProperty({ example: 'Family trip' })
   reason!: string;

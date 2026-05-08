@@ -1,3 +1,5 @@
+import { TypeLeave } from '../database/enums/type-leave.enum';
+
 export const LEAVE_REQUEST_STATUSES = [
   'pending',
   'approved',
@@ -17,6 +19,7 @@ export interface LeaveRequest {
   employeeEmail: string;
   employeeName: string;
   leaveDate: string;
+  type: TypeLeave;
   status: LeaveRequestStatus;
   createdAt: string;
   staff: LeaveRequestUser;
