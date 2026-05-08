@@ -187,6 +187,16 @@ describe('LeaveRequestsService', () => {
     expect(approved.status).toBe('approved');
     expect(approved.resolvedByStaffId).toBe(2);
     expect(staff.leaveCredit).toBe(11.5);
+    expect(mailService.send).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        to: '1@company.local',
+        subject: 'Leave request APPROVED',
+      }),
+      expect.objectContaining({
+        smtpUser: '2@company.local',
+        smtpPass: 'smtp-pass-2',
+      }),
+    );
   });
 
   it('allows heads to reject pending requests', async () => {
@@ -240,11 +250,34 @@ describe('LeaveRequestsService', () => {
       ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
+
+  it("uses HEAD's email when manager approves a request", async () => {
+    const created = await leaveRequestsService.create({
+      leaveDate: '2026-05-07',
+      reason: 'Personal work',
+      staffId: 1,
+      type: TypeLeave.FULL,
+    });
+
+    await leaveRequestsService.approve(created.requests[0].id, {}, 3);
+
+    expect(mailService.send).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        to: '1@company.local',
+        subject: 'Leave request APPROVED',
+      }),
+      expect.objectContaining({
+        smtpUser: '2@company.local',
+        smtpPass: 'smtp-pass-2',
+      }),
+    );
+  });
 });
 
 const mockStaffs = [
   createMockStaff(1, 'Nguyen Van An', 'STAFF'),
   createMockStaff(2, 'Pham Thu Ha', 'HEAD'),
+  createMockStaff(3, 'Tran Minh Quan', 'MANAGER'),
 ];
 
 function createMockStaff(

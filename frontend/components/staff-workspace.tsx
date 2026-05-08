@@ -4,9 +4,9 @@ import { useState } from "react";
 import type { LeaveRequestPaginationMeta } from "@/lib/leave-requests-api";
 import { leaveSessionCreditCost, leaveSessionOptions } from "@/lib/leave-session";
 import type { LeaveRequestRecord, LeaveSession, StaffRecord } from "@/types/leave-app";
-import { InlineAlert } from "./inline-alert";
 import { RequestTable } from "./request-table";
 import { SectionHeader } from "./section-header";
+import { useToast } from "./toast";
 
 export function StaffWorkspace({
   onRequestsPageChange,
@@ -32,30 +32,29 @@ export function StaffWorkspace({
   staff: StaffRecord;
   staffs: StaffRecord[];
 }) {
+  const toast = useToast();
   const [leaveDate, setLeaveDate] = useState("");
   const [typeLeave, setTypeLeave] = useState<LeaveSession>("FULL");
   const [reason, setReason] = useState("");
-  const [message, setMessage] = useState<string>();
   const todayDateKey = getTodayDateKey();
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setMessage(undefined);
 
     if (!leaveDate || !reason.trim()) {
-      setMessage("Cần nhập ngày nghỉ và lý do.");
+      toast.warning("Cần nhập ngày nghỉ và lý do.");
       return;
     }
     if (leaveDate < todayDateKey) {
-      setMessage("Chỉ được chọn ngày nghỉ từ hôm nay trở đi.");
+      toast.warning("Chỉ được chọn ngày nghỉ từ hôm nay trở đi.");
       return;
     }
     if (staff.leaveCredit < leaveSessionCreditCost(typeLeave)) {
-      setMessage("Nhân viên không đủ ngày phép cho lựa chọn này.");
+      toast.warning("Nhân viên không đủ ngày phép cho lựa chọn này.");
       return;
     }
     if (hasExistingRequestForDate(requests, staff.id, leaveDate)) {
-      setMessage("Bạn đã có đơn nghỉ phép cho ngày này.");
+      toast.warning("Bạn đã có đơn nghỉ phép cho ngày này.");
       return;
     }
 
@@ -64,9 +63,9 @@ export function StaffWorkspace({
       setLeaveDate("");
       setTypeLeave("FULL");
       setReason("");
-      setMessage("Đã gửi đơn cho HEAD duyệt.");
+      toast.success("Đã gửi đơn cho HEAD duyệt.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Gửi đơn thất bại.");
+      toast.error(error instanceof Error ? error.message : "Gửi đơn thất bại.");
     }
   }
 
@@ -122,11 +121,6 @@ export function StaffWorkspace({
             Gửi đơn
           </button>
         </form>
-        {message ? (
-          <div className="mt-3">
-            <InlineAlert message={message} tone={message.startsWith("Đã") ? "success" : "error"} />
-          </div>
-        ) : null}
       </section>
 
       <RequestTable

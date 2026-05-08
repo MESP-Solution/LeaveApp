@@ -14,6 +14,7 @@ import { Staff } from '../database/entities/staff.entity';
 import { PaginationMetaDto } from '../common/dto/success-response.dto';
 import type { AuthenticatedStaff } from '../auth/auth.types';
 import { CreateStaffDto } from './dto/create-staff.dto';
+import { RoleResponseDto } from './dto/role-response.dto';
 import { StaffResponseDto } from './dto/staff-response.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
 
@@ -89,6 +90,17 @@ export class StaffsService {
     );
   }
 
+  async findRoles(): Promise<RoleResponseDto[]> {
+    const roles = await this.roleRepository.findAll({
+      orderBy: { id: 'ASC' },
+    });
+
+    return roles.map((role) => ({
+      id: role.id,
+      name: role.name,
+    }));
+  }
+
   async create(
     dto: CreateStaffDto,
     creator: AuthenticatedStaff,
@@ -151,7 +163,11 @@ export class StaffsService {
     return this.toResponse(staff);
   }
 
-  async remove(id: number): Promise<void> {
+  async remove(id: number, requesterId?: number): Promise<void> {
+    if (typeof requesterId === 'number' && requesterId === id) {
+      throw new ForbiddenException('Cannot delete your own account');
+    }
+
     const staff = await this.findEntityById(id);
     const createdStaffCount = await this.staffRepository.count({
       createdBy: id,
@@ -250,7 +266,7 @@ export class StaffsService {
     const allowedTargetsByCreator: Record<string, Set<string>> = {
       ADMIN: new Set(['ADMIN', 'HEAD', 'MANAGER', 'STAFF']),
       HEAD: new Set(['HEAD', 'MANAGER', 'STAFF']),
-      MANAGER: new Set(['MANAGER', 'STAFF']),
+      MANAGER: new Set(['STAFF']),
     };
 
     const allowedTargets = allowedTargetsByCreator[normalizedCreator];

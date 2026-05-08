@@ -1,4 +1,4 @@
-import type { StaffRecord } from "@/types/leave-app";
+import type { RoleRecord, StaffRecord } from "@/types/leave-app";
 import { readApiErrorMessage, readSuccessResponse, unwrapApiResponse } from "./api-response";
 import { mapStaffFromApi } from "./leave-app-mappers";
 import { readAccessToken } from "./session";
@@ -19,6 +19,11 @@ type StaffApiDto = {
   role: string;
   leaveCredit: number;
   createdAt: string;
+};
+
+type RoleApiDto = {
+  id: number;
+  name: string;
 };
 
 type PaginationMeta = {
@@ -94,6 +99,17 @@ export async function createStaff(input: CreateStaffInput): Promise<StaffRecord>
   }
 
   return mapStaffFromApi(unwrapApiResponse<StaffApiDto>(payload));
+}
+
+export async function fetchRoles(): Promise<RoleRecord[]> {
+  const response = await authorizedFetch("/api/staffs/roles", { method: "GET" });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    throw new Error(readApiErrorMessage(payload, response.status));
+  }
+
+  const { data } = readSuccessResponse<RoleApiDto[]>(payload);
+  return data.map((role) => ({ id: role.id, name: role.name as RoleRecord["name"] }));
 }
 
 export async function deleteStaff(id: number): Promise<void> {

@@ -4,13 +4,13 @@ import { leaveSessionOptions } from "@/lib/leave-session";
 import type { ErdLeaveStatus, LeaveRequestRecord, LeaveSession, StaffRecord } from "@/types/leave-app";
 
 export type RequestFilterValues = {
-  staffId: string;
+  search: string;
   status: "" | ErdLeaveStatus;
   typeLeave: "" | LeaveSession;
 };
 
 export const defaultRequestFilters: RequestFilterValues = {
-  staffId: "",
+  search: "",
   status: "",
   typeLeave: "",
 };
@@ -18,41 +18,44 @@ export const defaultRequestFilters: RequestFilterValues = {
 export function filterRequests(
   requests: LeaveRequestRecord[],
   filters: RequestFilterValues,
+  staffs: StaffRecord[] = [],
 ): LeaveRequestRecord[] {
+  const term = filters.search.trim().toLowerCase();
+
   return requests.filter((request) => {
-    const matchesStaff = !filters.staffId || request.staffId === Number(filters.staffId);
     const matchesStatus = !filters.status || request.status === filters.status;
     const matchesType = !filters.typeLeave || request.type_leave === filters.typeLeave;
 
-    return matchesStaff && matchesStatus && matchesType;
+    if (!term) {
+      return matchesStatus && matchesType;
+    }
+
+    const staffName = findStaffName(staffs, request.staffId).toLowerCase();
+    const reason = (request.reason ?? "").toLowerCase();
+    const matchesSearch = staffName.includes(term) || reason.includes(term);
+
+    return matchesStatus && matchesType && matchesSearch;
   });
 }
 
 export function RequestFilters({
   filters,
   onChange,
-  staffs,
 }: {
   filters: RequestFilterValues;
   onChange: (filters: RequestFilterValues) => void;
-  staffs: StaffRecord[];
 }) {
   return (
     <div className="grid gap-3 rounded-md border border-slate-200 bg-white p-3 sm:grid-cols-3">
       <label className={filterLabelClassName}>
-        Nhân sự
-        <select
+        Tìm kiếm
+        <input
           className={filterInputClassName}
-          onChange={(event) => onChange({ ...filters, staffId: event.target.value })}
-          value={filters.staffId}
-        >
-          <option value="">Tất cả nhân sự</option>
-          {staffs.map((staff) => (
-            <option key={staff.id} value={staff.id}>
-              {findStaffName(staffs, staff.id)}
-            </option>
-          ))}
-        </select>
+          onChange={(event) => onChange({ ...filters, search: event.target.value })}
+          placeholder="Tìm theo tên nhân sự hoặc lý do"
+          type="search"
+          value={filters.search}
+        />
       </label>
 
       <label className={filterLabelClassName}>

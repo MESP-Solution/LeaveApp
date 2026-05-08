@@ -22,6 +22,7 @@ import {
 } from '../common/swagger/api-response.decorator';
 import type { AuthenticatedStaff } from '../auth/auth.types';
 import { CreateStaffDto } from './dto/create-staff.dto';
+import { RoleResponseDto } from './dto/role-response.dto';
 import { StaffResponseDto } from './dto/staff-response.dto';
 import { UpdateStaffDto } from './dto/update-staff.dto';
 import { StaffsService } from './staffs.service';
@@ -47,6 +48,19 @@ export class StaffsController {
     return this.staffsService.findAll(page, limit);
   }
 
+  @ApiSuccessResponse({
+    description: 'Role list',
+    status: 200,
+    isArray: true,
+    type: RoleResponseDto,
+  })
+  @ApiBearerAuth('jwt')
+  @UseGuards(JwtAuthGuard)
+  @Get('roles')
+  findRoles() {
+    return this.staffsService.findRoles();
+  }
+
   @ApiErrorResponse({ status: 404, description: 'Staff not found' })
   @ApiSuccessResponse({
     description: 'Staff detail',
@@ -67,7 +81,7 @@ export class StaffsController {
   })
   @ApiBearerAuth('jwt')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('ADMIN', 'HEAD', 'MANAGER')
+  @Roles('ADMIN', 'MANAGER')
   @Post()
   create(
     @Body() dto: CreateStaffDto,
@@ -102,8 +116,11 @@ export class StaffsController {
   @UseGuards(JwtAuthGuard, RolesGuard)
   @Roles('ADMIN')
   @Delete(':id')
-  async remove(@Param('id', ParseIntPipe) id: number) {
-    await this.staffsService.remove(id);
+  async remove(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentStaff() currentStaff: AuthenticatedStaff,
+  ) {
+    await this.staffsService.remove(id, currentStaff.id);
     return { deleted: true };
   }
 }

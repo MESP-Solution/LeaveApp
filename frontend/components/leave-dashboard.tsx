@@ -1,6 +1,6 @@
 ﻿"use client";
 import { useCallback, useEffect, useState } from "react";
-import { getCurrentStaff } from "@/lib/auth-api";
+import { useCurrentUser } from "@/lib/current-user-context";
 import { formatDate, formatDateTime, leaveStatusLabel } from "@/lib/formatters";
 import {
   approveLeaveRequest,
@@ -12,12 +12,19 @@ import {
 } from "@/lib/leave-requests-api";
 import { findRoleName } from "@/lib/leave-app-helpers";
 import { leaveSessionLabel } from "@/lib/leave-session";
-import { createStaff, deleteStaff, fetchAllStaffs, fetchStaffsPage } from "@/lib/staff-api";
-import type { LeaveRequestRecord, LeaveSession, StaffRecord } from "@/types/leave-app";
+import {
+  createStaff,
+  deleteStaff,
+  fetchAllStaffs,
+  fetchRoles,
+  fetchStaffsPage,
+} from "@/lib/staff-api";
+import type { LeaveRequestRecord, LeaveSession, RoleRecord, StaffRecord } from "@/types/leave-app";
 import { AdminWorkspace } from "./admin-workspace";
 import { LoginScreen } from "./login-screen";
 import { Metrics } from "./metrics";
 import { StaffWorkspace } from "./staff-workspace";
+import { useToast } from "./toast";
 
 const requestsPageSize = 10;
 
@@ -36,11 +43,11 @@ export function LeaveDashboard() {
     hasPreviousPage: boolean;
   }>();
   const [adminStaffPage, setAdminStaffPage] = useState(1);
-  const adminStaffPageSize = 5;
-  const [currentUser, setCurrentUser] = useState<StaffRecord>();
+  const adminStaffPageSize = 10;
+  const { currentUser, setCurrentUser, isRestoringSession, restoreError } = useCurrentUser();
+  const toast = useToast();
+  const [roles, setRoles] = useState<RoleRecord[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(false);
-  const [isRestoringSession, setIsRestoringSession] = useState(true);
-  const [message, setMessage] = useState<string>();
   const [selectedRequestId, setSelectedRequestId] = useState<number>();
   const [rejectNote, setRejectNote] = useState("");
   const [isProcessingRequest, setIsProcessingRequest] = useState(false);
@@ -50,26 +57,38 @@ export function LeaveDashboard() {
   const canProcessFromModal =
     currentRole === "ADMIN" || currentRole === "HEAD";
 
-  const reloadData = useCallback(async (staff: StaffRecord) => {
-    setIsLoadingData(true);
-    try {
-      const isStaff = findRoleName(staff) === "STAFF";
-      const staffId = isStaff ? staff.id : undefined;
-      const [staffData, leaveData, paged] = await Promise.all([
-        fetchAllStaffs({ pageSize: 100 }),
-        fetchAllLeaveRequests({ staffId }),
-        fetchLeaveRequestsPage({ page: 1, limit: requestsPageSize, staffId }),
-      ]);
-      setStaffs(staffData);
-      setRequests(leaveData);
-      setRequestsPage(paged.requests);
-      setRequestsPageMeta(paged.meta);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Không tải được dữ liệu từ máy chủ.");
-    } finally {
-      setIsLoadingData(false);
+  // Surface session-restore failures as a toast (only fires when restoreError changes).
+  useEffect(() => {
+    if (restoreError) {
+      toast.error(restoreError);
     }
-  }, []);
+  }, [restoreError, toast]);
+
+  const reloadData = useCallback(
+    async (staff: StaffRecord) => {
+      setIsLoadingData(true);
+      try {
+        const isStaff = findRoleName(staff) === "STAFF";
+        const staffId = isStaff ? staff.id : undefined;
+        const [staffData, leaveData, paged] = await Promise.all([
+          fetchAllStaffs({ pageSize: 100 }),
+          fetchAllLeaveRequests({ staffId }),
+          fetchLeaveRequestsPage({ page: 1, limit: requestsPageSize, staffId }),
+        ]);
+        setStaffs(staffData);
+        setRequests(leaveData);
+        setRequestsPage(paged.requests);
+        setRequestsPageMeta(paged.meta);
+      } catch (error) {
+        toast.error(
+          error instanceof Error ? error.message : "Không tải được dữ liệu từ máy chủ.",
+        );
+      } finally {
+        setIsLoadingData(false);
+      }
+    },
+    [toast],
+  );
 
   const reloadRequestsPage = useCallback(
     async (nextPage: number) => {
@@ -85,12 +104,12 @@ export function LeaveDashboard() {
         setRequestsPage(pageRequests);
         setRequestsPageMeta(meta);
       } catch (error) {
-        setMessage(
+        toast.error(
           error instanceof Error ? error.message : "Không tải được danh sách đơn.",
         );
       }
     },
-    [currentUser],
+    [currentUser, toast],
   );
 
   const reloadAdminStaffPage = useCallback(
@@ -106,30 +125,25 @@ export function LeaveDashboard() {
     [adminStaffPageSize],
   );
 
+  // Load workspace data whenever a user becomes available (initial restore or after login).
   useEffect(() => {
+    if (!currentUser) return;
     let isActive = true;
 
     void (async () => {
       try {
-        const staff = await getCurrentStaff();
-        if (!isActive || !staff) {
-          return;
-        }
-
-        setCurrentUser(staff);
-        await reloadData(staff);
-        if (findRoleName(staff) !== "STAFF") {
-          await reloadAdminStaffPage(1);
+        await reloadData(currentUser);
+        if (findRoleName(currentUser) !== "STAFF") {
+          const [loadedRoles] = await Promise.all([fetchRoles(), reloadAdminStaffPage(1)]);
+          if (isActive) {
+            setRoles(loadedRoles);
+          }
         }
       } catch (error) {
         if (isActive) {
-          setMessage(
-            error instanceof Error ? error.message : "Không thể khôi phục phiên đăng nhập.",
+          toast.error(
+            error instanceof Error ? error.message : "Không tải được dữ liệu nhân sự.",
           );
-        }
-      } finally {
-        if (isActive) {
-          setIsRestoringSession(false);
         }
       }
     })();
@@ -137,7 +151,7 @@ export function LeaveDashboard() {
     return () => {
       isActive = false;
     };
-  }, [reloadAdminStaffPage, reloadData]);
+  }, [currentUser, reloadAdminStaffPage, reloadData, toast]);
 
   if (isRestoringSession) {
     return (
@@ -189,9 +203,6 @@ export function LeaveDashboard() {
 
   return (
     <div className="grid gap-6">
-      {message ? <p className="text-sm text-rose-700">{message}</p> : null}
-
-      {currentRole !== "STAFF" ? <RoleHeader staff={currentUser} role={currentRole} /> : null}
       {currentRole !== "STAFF" ? <Metrics requests={requests} staffs={staffs} /> : null}
       {isLoadingData ? <p className="text-sm text-slate-600">Đang tải dữ liệu từ máy chủ...</p> : null}
 
@@ -215,6 +226,7 @@ export function LeaveDashboard() {
           onPageChange={(nextPage) => reloadAdminStaffPage(nextPage)}
           onRequestsPageChange={reloadRequestsPage}
           onViewRequest={openRequestDetail}
+          roles={roles}
           staffMeta={adminStaffMeta}
           requests={requests}
           requestsMeta={requestsPageMeta}
@@ -306,16 +318,8 @@ export function LeaveDashboard() {
   );
 
   function handleLogin(staff: StaffRecord) {
+    // Data load is handled by the effect that watches currentUser.
     setCurrentUser(staff);
-    void reloadData(staff).then(async () => {
-      if (findRoleName(staff) !== "STAFF") {
-        try {
-          await reloadAdminStaffPage(1);
-        } catch (error) {
-          setMessage(error instanceof Error ? error.message : "Không tải được danh sách nhân sự.");
-        }
-      }
-    });
   }
 
   function updateRequest(nextRequest: LeaveRequestRecord) {
@@ -352,13 +356,15 @@ export function LeaveDashboard() {
       if (action === "approve") {
         const updated = await approveLeaveRequest(selectedRequest.id);
         updateRequest(updated);
+        toast.success("Đã duyệt đơn nghỉ.");
       } else {
         const updated = await rejectLeaveRequest(selectedRequest.id, rejectNote.trim());
         updateRequest(updated);
+        toast.success("Đã từ chối đơn nghỉ.");
       }
       setRejectNote("");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Không xử lý được đơn nghỉ.");
+      toast.error(error instanceof Error ? error.message : "Không xử lý được đơn nghỉ.");
     } finally {
       setIsProcessingRequest(false);
     }
@@ -392,35 +398,6 @@ function DetailRow({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
-
-function RoleHeader({
-  role,
-  staff,
-}: {
-  role: "ADMIN" | "HEAD" | "MANAGER";
-  staff: StaffRecord;
-}) {
-  return (
-    <div className="rounded-md border border-slate-200 bg-white p-4">
-      <p className="text-xs font-medium uppercase text-slate-500">Người đang đăng nhập</p>
-      <div className="mt-1 flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-950">{staff.fullName}</h1>
-          <p className="mt-1 text-sm text-slate-600">{staff.email}</p>
-        </div>
-        <span className="rounded-md border border-slate-200 bg-slate-50 px-3 py-1 text-sm font-medium text-slate-700">
-          {roleLabelByName[role]}
-        </span>
-      </div>
-    </div>
-  );
-}
-
-const roleLabelByName: Record<"ADMIN" | "HEAD" | "MANAGER", string> = {
-  ADMIN: "Admin",
-  HEAD: "Head",
-  MANAGER: "Manager",
-};
 
 const modalOverlayClassName =
   "fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4";

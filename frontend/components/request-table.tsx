@@ -50,8 +50,8 @@ export function RequestTable({
   const [clientPage, setClientPage] = useState(1);
   const calendarSource = calendarRequests ?? requests;
   const filteredRequests = useMemo(
-    () => (enableFilters ? filterRequests(calendarSource, filters) : calendarSource),
-    [calendarSource, enableFilters, filters],
+    () => (enableFilters ? filterRequests(calendarSource, filters, staffs) : calendarSource),
+    [calendarSource, enableFilters, filters, staffs],
   );
   const clientPageSize = pagination?.pageSize ?? Math.max(requests.length, 1);
   const clientTotalPages = Math.max(1, Math.ceil(filteredRequests.length / clientPageSize));
@@ -109,7 +109,6 @@ export function RequestTable({
                 setFilters(nextFilters);
                 setClientPage(1);
               }}
-              staffs={staffs}
             />
           ) : null}
 

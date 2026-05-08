@@ -173,6 +173,7 @@ export class LeaveRequestsService {
     this.logger.log(
       `Processed leaveRequestId=${leaveRequest.id} status=${status} resolverStaffId=${resolverStaff.id} staffId=${leaveRequest.staff.id}`,
     );
+    const headSender = await this.getHeadSender();
     await this.mailService.send(
       {
         to: leaveRequest.staff.email,
@@ -180,8 +181,8 @@ export class LeaveRequestsService {
         text: `Your leave request ${leaveRequest.id} was ${status}.`,
       },
       {
-        smtpUser: resolverStaff.email,
-        smtpPass: resolverStaff.smtpPass,
+        smtpUser: headSender.email,
+        smtpPass: headSender.smtpPass,
       },
     );
 
@@ -314,6 +315,24 @@ export class LeaveRequestsService {
         ),
       ),
     );
+  }
+
+  private async getHeadSender(): Promise<{ email: string; smtpPass: string }> {
+    const heads = await this.staffsService.findByRoleName('HEAD');
+    const headSender = heads.find(
+      (head) => Boolean(head.email?.trim()) && Boolean(head.smtpPass?.trim()),
+    );
+
+    if (!headSender) {
+      throw new BadRequestException(
+        'No HEAD account with SMTP credentials is available to send notifications',
+      );
+    }
+
+    return {
+      email: headSender.email,
+      smtpPass: headSender.smtpPass,
+    };
   }
 
   private isValidDate(value: string): boolean {

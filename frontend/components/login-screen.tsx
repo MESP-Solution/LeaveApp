@@ -4,24 +4,23 @@ import { useState } from "react";
 import { loginWithEmailPassword } from "@/lib/auth-api";
 import { saveAccessToken } from "@/lib/session";
 import type { StaffRecord } from "@/types/leave-app";
-import { InlineAlert } from "./inline-alert";
+import { useToast } from "./toast";
 
 export function LoginScreen({
   onLogin,
 }: {
   onLogin: (staff: StaffRecord) => void;
 }) {
+  const toast = useToast();
   const [email, setEmail] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [message, setMessage] = useState<string>();
   const [password, setPassword] = useState("");
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setMessage(undefined);
 
     if (!email.trim() || !password.trim()) {
-      setMessage("Vui lòng nhập email và mật khẩu.");
+      toast.warning("Vui lòng nhập email và mật khẩu.");
       return;
     }
 
@@ -29,9 +28,10 @@ export function LoginScreen({
     try {
       const session = await loginWithEmailPassword(email.trim(), password);
       saveAccessToken(session.accessToken);
+      toast.success("Đăng nhập thành công.");
       onLogin(session.staff);
     } catch (error) {
-      setMessage(
+      toast.error(
         error instanceof Error
           ? error.message
           : "Đăng nhập thất bại. Vui lòng thử lại.",
@@ -77,11 +77,6 @@ export function LoginScreen({
             {isSubmitting ? "Đang đăng nhập..." : "Đăng nhập"}
           </button>
         </form>
-        {message ? (
-          <div className="mt-3">
-            <InlineAlert message={message} tone="error" />
-          </div>
-        ) : null}
       </section>
     </div>
   );

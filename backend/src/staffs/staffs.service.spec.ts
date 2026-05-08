@@ -11,6 +11,27 @@ import { Staff } from '../database/entities/staff.entity';
 import { StaffsService } from './staffs.service';
 
 describe('StaffsService.remove', () => {
+  it('throws ForbiddenException when attempting to self-delete', async () => {
+    const staffRepository = {
+      findOne: jest.fn(),
+      count: jest.fn(),
+    };
+
+    const svc = new StaffsService(
+      staffRepository as unknown as EntityRepository<Staff>,
+      {} as unknown as EntityRepository<Role>,
+      {
+        count: jest.fn(() => Promise.resolve(0)),
+      } as unknown as EntityRepository<LeaveRequest>,
+      {
+        removeAndFlush: jest.fn(() => Promise.resolve(undefined)),
+      } as unknown as EntityManager,
+    );
+
+    await expect(svc.remove(1, 1)).rejects.toBeInstanceOf(ForbiddenException);
+    expect(staffRepository.findOne).not.toHaveBeenCalled();
+  });
+
   it('throws ConflictException when staff is createdBy for others', async () => {
     const staffs: Staff[] = [];
 
@@ -131,6 +152,16 @@ describe('StaffsService.create (role rules)', () => {
         'STAFF',
       ),
     ).resolves.toBeUndefined();
+  });
+
+  it('forbids MANAGER from creating MANAGER', async () => {
+    const { svc } = makeService();
+    await expect(
+      (svc as unknown as ServiceWithRoleAssertions).assertCanCreateRole(
+        'MANAGER',
+        'MANAGER',
+      ),
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('rejects creating a second ADMIN', async () => {
