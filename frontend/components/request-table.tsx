@@ -1,10 +1,17 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { formatDate, formatDateTime, leaveStatusLabel } from "@/lib/formatters";
 import { findStaffName } from "@/lib/leave-app-helpers";
 import { leaveSessionLabel } from "@/lib/leave-session";
 import type { LeaveRequestRecord, StaffRecord } from "@/types/leave-app";
 import { EmptyState } from "./empty-state";
 import { LeaveCalendar } from "./leave-calendar";
+import {
+  defaultRequestFilters,
+  filterRequests,
+  RequestFilters,
+  type RequestFilterValues,
+} from "./request-filters";
+import { RequestPaginationControls } from "./request-pagination-controls";
 
 const statusClasses: Record<LeaveRequestRecord["status"], string> = {
   APPROVED: "border-emerald-200 bg-emerald-50 text-emerald-700",
@@ -14,6 +21,7 @@ const statusClasses: Record<LeaveRequestRecord["status"], string> = {
 
 export function RequestTable({
   calendarRequests,
+  enableFilters = false,
   requests,
   staffs,
   title,
@@ -23,6 +31,7 @@ export function RequestTable({
   minSelectableDate,
 }: {
   calendarRequests?: LeaveRequestRecord[];
+  enableFilters?: boolean;
   minSelectableDate?: string;
   requests: LeaveRequestRecord[];
   staffs: StaffRecord[];
@@ -37,18 +46,36 @@ export function RequestTable({
   onRequestClick?: (request: LeaveRequestRecord) => void;
 }) {
   const [viewMode, setViewMode] = useState<"calendar" | "table">("calendar");
+  const [filters, setFilters] = useState<RequestFilterValues>(defaultRequestFilters);
+  const [clientPage, setClientPage] = useState(1);
   const calendarSource = calendarRequests ?? requests;
+  const filteredRequests = useMemo(
+    () => (enableFilters ? filterRequests(calendarSource, filters) : calendarSource),
+    [calendarSource, enableFilters, filters],
+  );
+  const clientPageSize = pagination?.pageSize ?? Math.max(requests.length, 1);
+  const clientTotalPages = Math.max(1, Math.ceil(filteredRequests.length / clientPageSize));
+  const activeClientPage = Math.min(clientPage, clientTotalPages);
+  const displayedRequests = enableFilters
+    ? filteredRequests.slice((activeClientPage - 1) * clientPageSize, activeClientPage * clientPageSize)
+    : requests;
+  const displayedPagination = enableFilters ? undefined : pagination;
 
   if (calendarSource.length === 0 && requests.length === 0) {
     return <EmptyState title="Chưa có đơn" description="Đơn nghỉ phép sẽ hiển thị tại đây." />;
   }
 
-  const pageSize = pagination?.pageSize ?? requests.length;
-  const page = pagination?.page ?? 1;
+  const pageSize = enableFilters ? clientPageSize : displayedPagination?.pageSize ?? displayedRequests.length;
+  const page = enableFilters ? activeClientPage : displayedPagination?.page ?? 1;
   const totalPages =
-    pagination && pagination.total > 0
-      ? Math.max(1, Math.ceil(pagination.total / pageSize))
+    enableFilters
+      ? clientTotalPages
+      : displayedPagination && displayedPagination.total > 0
+      ? Math.max(1, Math.ceil(displayedPagination.total / pageSize))
       : 1;
+  const shouldShowPagination = enableFilters
+    ? filteredRequests.length > clientPageSize
+    : Boolean(displayedPagination && totalPages > 1);
 
   return (
     <div className="grid gap-4">
@@ -74,13 +101,24 @@ export function RequestTable({
           </div>
         </div>
 
-        <div className="pt-10">
+        <div className="grid gap-3 pt-10">
+          {enableFilters ? (
+            <RequestFilters
+              filters={filters}
+              onChange={(nextFilters) => {
+                setFilters(nextFilters);
+                setClientPage(1);
+              }}
+              staffs={staffs}
+            />
+          ) : null}
+
           {viewMode === "calendar" ? (
             <LeaveCalendar
               minSelectableDate={minSelectableDate}
               onDateSelect={onDateSelect}
               onRequestClick={onRequestClick}
-              requests={calendarSource}
+              requests={filteredRequests}
               staffs={staffs}
             />
           ) : null}
@@ -90,8 +128,12 @@ export function RequestTable({
               <div className="border-b border-slate-200 px-4 py-3">
                 <h2 className="text-base font-semibold text-slate-950">{title}</h2>
               </div>
-              {pagination && totalPages > 1 ? (
-                <PaginationControls page={page} pagination={pagination} totalPages={totalPages} />
+              {shouldShowPagination ? (
+                <RequestPaginationControls
+                  onPageChange={enableFilters ? setClientPage : displayedPagination!.onPageChange}
+                  page={page}
+                  totalPages={totalPages}
+                />
               ) : null}
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[820px] border-collapse text-left text-sm">
@@ -106,7 +148,7 @@ export function RequestTable({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {requests.map((request) => (
+                    {displayedRequests.map((request) => (
                       <tr
                         className={`align-top ${onRequestClick ? "cursor-pointer hover:bg-slate-50" : ""}`}
                         key={request.id}
@@ -142,6 +184,11 @@ export function RequestTable({
                     ))}
                   </tbody>
                 </table>
+                {displayedRequests.length === 0 ? (
+                  <p className="px-4 py-6 text-sm text-slate-600">
+                    Không có đơn nào phù hợp với bộ lọc.
+                  </p>
+                ) : null}
               </div>
             </div>
           ) : null}
@@ -151,45 +198,6 @@ export function RequestTable({
   );
 }
 
-function PaginationControls({
-  page,
-  pagination,
-  totalPages,
-}: {
-  page: number;
-  pagination: NonNullable<Parameters<typeof RequestTable>[0]["pagination"]>;
-  totalPages: number;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-2">
-      <div className="text-sm text-slate-600">
-        Trang <span className="font-medium text-slate-900">{page}</span> /{" "}
-        <span className="font-medium text-slate-900">{totalPages}</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <button
-          className={paginationButtonClassName}
-          disabled={page <= 1}
-          onClick={() => pagination.onPageChange(page - 1)}
-          type="button"
-        >
-          Trước
-        </button>
-        <button
-          className={paginationButtonClassName}
-          disabled={page >= totalPages}
-          onClick={() => pagination.onPageChange(page + 1)}
-          type="button"
-        >
-          Sau
-        </button>
-      </div>
-    </div>
-  );
-}
-
 const activeTabClassName = "bg-slate-900 px-3 py-1 text-sm font-medium text-white";
 const inactiveTabClassName =
   "bg-white px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50";
-const paginationButtonClassName =
-  "rounded-md border border-slate-300 bg-white px-3 py-1 text-sm font-medium text-slate-700 disabled:cursor-not-allowed disabled:bg-slate-100";

@@ -28,6 +28,7 @@ export function AdminWorkspace({
     fullName: string;
     email: string;
     password: string;
+    smtpPass: string;
     roleId?: number;
     leaveCredit?: number;
   }) => Promise<void>;
@@ -62,6 +63,7 @@ export function AdminWorkspace({
     fullName: "",
     email: "",
     password: "",
+    smtpPass: "",
     roleId: 1,
     leaveCredit: 12,
   });
@@ -70,8 +72,13 @@ export function AdminWorkspace({
     event.preventDefault();
     setMessage(undefined);
 
-    if (!form.fullName.trim() || !form.email.trim() || !form.password.trim()) {
-      setMessage("Vui lòng nhập đầy đủ họ tên, email, mật khẩu.");
+    if (!form.fullName.trim() || !form.email.trim() || !form.password.trim() || !form.smtpPass.trim()) {
+      setMessage("Vui lòng nhập đầy đủ họ tên, email, mật khẩu và SMTP.");
+      return;
+    }
+
+    if (form.password.length < 8 || form.smtpPass.trim().length < 8) {
+      setMessage("Mật khẩu đăng nhập và SMTP phải có tối thiểu 8 ký tự.");
       return;
     }
 
@@ -81,6 +88,7 @@ export function AdminWorkspace({
         fullName: form.fullName.trim(),
         email: form.email.trim(),
         password: form.password,
+        smtpPass: form.smtpPass.trim(),
         roleId: Number(form.roleId),
         leaveCredit: Number(form.leaveCredit),
       });
@@ -88,6 +96,7 @@ export function AdminWorkspace({
         fullName: "",
         email: "",
         password: "",
+        smtpPass: "",
         roleId: 1,
         leaveCredit: 12,
       });
@@ -201,6 +210,7 @@ export function AdminWorkspace({
       </section>
       <RequestTable
         calendarRequests={requests}
+        enableFilters
         onRequestClick={onViewRequest}
         pagination={
           requestsMeta
@@ -263,6 +273,7 @@ export function AdminWorkspace({
                 Mật khẩu
                 <input
                   className={inputClassName}
+                  minLength={8}
                   onChange={(event) =>
                     setForm((current) => ({ ...current, password: event.target.value }))
                   }
@@ -270,6 +281,20 @@ export function AdminWorkspace({
                   title="Mật khẩu đăng nhập"
                   type="password"
                   value={form.password}
+                />
+              </label>
+              <label className={fieldLabelClassName}>
+                Mật khẩu SMTP
+                <input
+                  className={inputClassName}
+                  minLength={8}
+                  onChange={(event) =>
+                    setForm((current) => ({ ...current, smtpPass: event.target.value }))
+                  }
+                  placeholder="Nhập mật khẩu SMTP hoặc app password"
+                  title="Mật khẩu SMTP dùng để gửi email"
+                  type="password"
+                  value={form.smtpPass}
                 />
               </label>
               <div className="grid grid-cols-2 gap-2">

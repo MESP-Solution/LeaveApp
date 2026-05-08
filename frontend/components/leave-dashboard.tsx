@@ -168,6 +168,7 @@ export function LeaveDashboard() {
     fullName: string;
     email: string;
     password: string;
+    smtpPass: string;
     roleId?: number;
     leaveCredit?: number;
   }) {
@@ -190,6 +191,7 @@ export function LeaveDashboard() {
     <div className="grid gap-6">
       {message ? <p className="text-sm text-rose-700">{message}</p> : null}
 
+      {currentRole !== "STAFF" ? <RoleHeader staff={currentUser} role={currentRole} /> : null}
       {currentRole !== "STAFF" ? <Metrics requests={requests} staffs={staffs} /> : null}
       {isLoadingData ? <p className="text-sm text-slate-600">Đang tải dữ liệu từ máy chủ...</p> : null}
 
@@ -390,6 +392,35 @@ function DetailRow({ label, value }: { label: string; value: string }) {
     </div>
   );
 }
+
+function RoleHeader({
+  role,
+  staff,
+}: {
+  role: "ADMIN" | "HEAD" | "MANAGER";
+  staff: StaffRecord;
+}) {
+  return (
+    <div className="rounded-md border border-slate-200 bg-white p-4">
+      <p className="text-xs font-medium uppercase text-slate-500">Người đang đăng nhập</p>
+      <div className="mt-1 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-xl font-semibold text-slate-950">{staff.fullName}</h1>
+          <p className="mt-1 text-sm text-slate-600">{staff.email}</p>
+        </div>
+        <span className="rounded-md border border-slate-200 bg-slate-50 px-3 py-1 text-sm font-medium text-slate-700">
+          {roleLabelByName[role]}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+const roleLabelByName: Record<"ADMIN" | "HEAD" | "MANAGER", string> = {
+  ADMIN: "Admin",
+  HEAD: "Head",
+  MANAGER: "Manager",
+};
 
 const modalOverlayClassName =
   "fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4";

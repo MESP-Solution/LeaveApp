@@ -7,6 +7,7 @@ type CreateStaffInput = {
   fullName: string;
   email: string;
   password: string;
+  smtpPass: string;
   roleId?: number;
   leaveCredit?: number;
 };
