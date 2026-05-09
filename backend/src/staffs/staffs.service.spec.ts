@@ -90,6 +90,100 @@ describe('StaffsService.remove', () => {
 
     await expect(svc.remove(999)).rejects.toBeInstanceOf(NotFoundException);
   });
+
+  it('throws ConflictException when deleting an ADMIN account', async () => {
+    const adminStaff = createStaff(42);
+
+    const staffRepository = {
+      findOne: jest.fn(() => Promise.resolve(adminStaff)),
+      count: jest.fn(),
+    };
+
+    const em = { removeAndFlush: jest.fn() };
+
+    const svc = new StaffsService(
+      staffRepository as unknown as EntityRepository<Staff>,
+      {} as unknown as EntityRepository<Role>,
+      {
+        count: jest.fn(() => Promise.resolve(0)),
+      } as unknown as EntityRepository<LeaveRequest>,
+      em as unknown as EntityManager,
+    );
+
+    await expect(svc.remove(42, 99)).rejects.toBeInstanceOf(ConflictException);
+    expect(staffRepository.count).not.toHaveBeenCalled();
+    expect(em.removeAndFlush).not.toHaveBeenCalled();
+  });
+
+  it('throws ConflictException when staff has leave requests as employee', async () => {
+    const staff = createStaff(5);
+    staff.role = Object.assign(new Role(), { id: 2, name: 'STAFF' });
+
+    const staffRepository = {
+      findOne: jest.fn(() => Promise.resolve(staff)),
+      count: jest.fn(() => Promise.resolve(0)),
+    };
+
+    const leaveRequestRepository = {
+      count: jest.fn(
+        (filter: { staff?: number; resolvedByStaff?: number }) =>
+          Promise.resolve('staff' in filter && filter.staff === 5 ? 1 : 0),
+      ),
+    };
+
+    const em = { removeAndFlush: jest.fn() };
+
+    const svc = new StaffsService(
+      staffRepository as unknown as EntityRepository<Staff>,
+      {} as unknown as EntityRepository<Role>,
+      leaveRequestRepository as unknown as EntityRepository<LeaveRequest>,
+      em as unknown as EntityManager,
+    );
+
+    await expect(svc.remove(5)).rejects.toBeInstanceOf(ConflictException);
+    expect(em.removeAndFlush).not.toHaveBeenCalled();
+  });
+
+  it('throws ConflictException when staff has processed leave requests', async () => {
+    const staff = createStaff(6);
+    staff.role = Object.assign(new Role(), { id: 3, name: 'HEAD' });
+
+    const staffRepository = {
+      findOne: jest.fn(() => Promise.resolve(staff)),
+      count: jest.fn(() => Promise.resolve(0)),
+    };
+
+    const leaveRequestRepository = {
+      count: jest
+        .fn()
+        .mockImplementationOnce(
+          (filter: { staff?: number; resolvedByStaff?: number }) =>
+            Promise.resolve(
+              'staff' in filter && filter.staff === 6 ? 0 : 0,
+            ),
+        )
+        .mockImplementationOnce(
+          (filter: { staff?: number; resolvedByStaff?: number }) =>
+            Promise.resolve(
+              'resolvedByStaff' in filter && filter.resolvedByStaff === 6
+                ? 1
+                : 0,
+            ),
+        ),
+    };
+
+    const em = { removeAndFlush: jest.fn() };
+
+    const svc = new StaffsService(
+      staffRepository as unknown as EntityRepository<Staff>,
+      {} as unknown as EntityRepository<Role>,
+      leaveRequestRepository as unknown as EntityRepository<LeaveRequest>,
+      em as unknown as EntityManager,
+    );
+
+    await expect(svc.remove(6)).rejects.toBeInstanceOf(ConflictException);
+    expect(em.removeAndFlush).not.toHaveBeenCalled();
+  });
 });
 
 describe('StaffsService.create (role rules)', () => {

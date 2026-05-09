@@ -14,7 +14,7 @@ describe('LeaveRequestsService', () => {
   let leaveRequestsService: LeaveRequestsService;
   let nextId: number;
   let staffsService: Pick<StaffsService, 'findByRoleName' | 'findEntityById'>;
-  let mailService: Pick<MailService, 'send'>;
+  let mailService: Pick<MailService, 'send' | 'sendWithAppResend'>;
 
   beforeEach(() => {
     dbRequests = [];
@@ -98,6 +98,7 @@ describe('LeaveRequestsService', () => {
 
     mailService = {
       send: jest.fn().mockResolvedValue(undefined),
+      sendWithAppResend: jest.fn().mockResolvedValue(undefined),
     };
 
     leaveRequestsService = new LeaveRequestsService(
@@ -121,7 +122,7 @@ describe('LeaveRequestsService', () => {
     expect(created.requests[0].staffId).toBe(1);
   });
 
-  it('notifies each HEAD and MANAGER by sending from their own Resend credentials', async () => {
+  it('notifies HEAD and MANAGER in one Resend request (batched recipients)', async () => {
     await leaveRequestsService.create({
       leaveDate: '2026-05-08',
       reason: 'Conference',
@@ -131,21 +132,15 @@ describe('LeaveRequestsService', () => {
 
     await new Promise<void>((resolve) => setImmediate(resolve));
 
-    expect(mailService.send).toHaveBeenCalledTimes(2);
-    expect(mailService.send).toHaveBeenCalledWith(
-      expect.objectContaining({ to: '2@company.local' }),
-      {
-        smtpUser: '2@company.local',
-        smtpPass: 'smtp-pass-2',
-      },
+    expect(mailService.sendWithAppResend).toHaveBeenCalledTimes(1);
+    expect(mailService.sendWithAppResend).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: expect.arrayContaining(['2@company.local', '3@company.local']),
+      }),
     );
-    expect(mailService.send).toHaveBeenCalledWith(
-      expect.objectContaining({ to: '3@company.local' }),
-      {
-        smtpUser: '3@company.local',
-        smtpPass: 'smtp-pass-3',
-      },
-    );
+    expect((mailService.sendWithAppResend as jest.Mock).mock.calls[0][0].to)
+      .toHaveLength(2);
+    expect(mailService.send).not.toHaveBeenCalled();
   });
 
   it('creates half-day leave request and returns decimal totalDays', async () => {
@@ -161,7 +156,9 @@ describe('LeaveRequestsService', () => {
   });
 
   it('creates leave request without waiting for approver notification', async () => {
-    (mailService.send as jest.Mock).mockRejectedValueOnce(new Error('SMTP down'));
+    (mailService.sendWithAppResend as jest.Mock).mockRejectedValueOnce(
+      new Error('SMTP down'),
+    );
 
     const created = await leaveRequestsService.create({
       leaveDate: '2026-05-06',
@@ -214,14 +211,10 @@ describe('LeaveRequestsService', () => {
     expect(approved.status).toBe('approved');
     expect(approved.resolvedByStaffId).toBe(2);
     expect(staff.leaveCredit).toBe(11.5);
-    expect(mailService.send).toHaveBeenLastCalledWith(
+    expect(mailService.sendWithAppResend).toHaveBeenLastCalledWith(
       expect.objectContaining({
         to: '1@company.local',
         subject: 'Leave request APPROVED',
-      }),
-      expect.objectContaining({
-        smtpUser: '1@company.local',
-        smtpPass: 'smtp-pass-1',
       }),
     );
   });

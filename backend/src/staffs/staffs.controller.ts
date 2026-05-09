@@ -103,8 +103,20 @@ export class StaffsController {
   }
 
   @ApiErrorResponse({
+    status: 403,
+    description: 'Cannot delete your own account',
+  })
+  @ApiErrorResponse({
     status: 409,
-    description: 'Cannot delete staff with leave request history',
+    description: 'Cannot delete an ADMIN account',
+  })
+  @ApiErrorResponse({
+    status: 409,
+    description: 'Cannot delete staff who has leave requests',
+  })
+  @ApiErrorResponse({
+    status: 409,
+    description: 'Cannot delete staff who has processed leave requests',
   })
   @ApiErrorResponse({
     status: 409,

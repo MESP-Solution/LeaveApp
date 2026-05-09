@@ -169,6 +169,11 @@ export class StaffsService {
     }
 
     const staff = await this.findEntityById(id);
+
+    if (staff.role.name === 'ADMIN') {
+      throw new ConflictException('Cannot delete an ADMIN account');
+    }
+
     const createdStaffCount = await this.staffRepository.count({
       createdBy: id,
     });
@@ -177,12 +182,22 @@ export class StaffsService {
         'Cannot delete staff who created other staff records',
       );
     }
-    const leaveRequestCount = await this.leaveRequestRepository.count({
-      $or: [{ staff: id }, { resolvedByStaff: id }],
+
+    const leaveRequestsAsEmployee = await this.leaveRequestRepository.count({
+      staff: id,
     });
-    if (leaveRequestCount > 0) {
+    if (leaveRequestsAsEmployee > 0) {
       throw new ConflictException(
-        'Cannot delete staff with leave request history',
+        'Cannot delete staff who has leave requests',
+      );
+    }
+
+    const leaveRequestsResolved = await this.leaveRequestRepository.count({
+      resolvedByStaff: id,
+    });
+    if (leaveRequestsResolved > 0) {
+      throw new ConflictException(
+        'Cannot delete staff who has processed leave requests',
       );
     }
     await this.em.removeAndFlush(staff);

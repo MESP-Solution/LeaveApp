@@ -173,26 +173,31 @@ export class LeaveRequestsService {
       `Processed leaveRequestId=${leaveRequest.id} status=${status} resolverStaffId=${resolverStaff.id} staffId=${leaveRequest.staff.id}`,
     );
 
-    const mailSender = this.resolveEmployeeOutcomeMailSender(
-      resolverStaff,
-      leaveRequest,
-    );
-    if (mailSender) {
-      await this.mailService.send(
-        {
-          to: leaveRequest.staff.email,
-          subject: `Leave request ${status}`,
-          text: `Your leave request ${leaveRequest.id} was ${status}.`,
-        },
-        {
-          smtpUser: mailSender.email,
-          smtpPass: mailSender.smtpPass,
-        },
-      );
+    if (resolverStaff.role.name === 'HEAD') {
+      await this.mailService.sendWithAppResend({
+        to: leaveRequest.staff.email,
+        subject: `Leave request ${status}`,
+        text: `Your leave request ${leaveRequest.id} was ${status}.`,
+      });
     } else {
-      this.logger.warn(
-        `No Resend credentials for employee notification (leaveRequestId=${leaveRequest.id}, resolverStaffId=${resolverStaff.id}); skipping mail`,
-      );
+      const mailSender = this.resolveEmployeeOutcomeMailSender(resolverStaff);
+      if (mailSender) {
+        await this.mailService.send(
+          {
+            to: leaveRequest.staff.email,
+            subject: `Leave request ${status}`,
+            text: `Your leave request ${leaveRequest.id} was ${status}.`,
+          },
+          {
+            smtpUser: mailSender.email,
+            smtpPass: mailSender.smtpPass,
+          },
+        );
+      } else {
+        this.logger.warn(
+          `No Resend credentials for employee notification (leaveRequestId=${leaveRequest.id}, resolverStaffId=${resolverStaff.id}); skipping mail`,
+        );
+      }
     }
 
     return this.toResponse(leaveRequest);
@@ -234,9 +239,8 @@ export class LeaveRequestsService {
     for (const staff of [...heads, ...managers]) {
       byId.set(staff.id, staff);
     }
-    const approvers = Array.from(byId.values()).filter(
-      (staff) =>
-        Boolean(staff.email?.trim()) && Boolean(staff.smtpPass?.trim()),
+    const approvers = Array.from(byId.values()).filter((staff) =>
+      Boolean(staff.email?.trim()),
     );
 
     this.logger.debug(
@@ -314,41 +318,30 @@ export class LeaveRequestsService {
           `,
     };
 
-    await Promise.all(
-      approvers.map((approver) =>
-        this.mailService.send(
-          { ...mailMessage, to: approver.email },
-          {
-            smtpUser: approver.email,
-            smtpPass: approver.smtpPass,
-          },
-        ),
+    const to = Array.from(
+      new Set(
+        approvers
+          .map((a) => a.email.trim())
+          .filter(Boolean),
       ),
     );
-  }
-
-  /**
-   * When a HEAD approves/rejects, the outcome email to the employee is sent with the
-   * request owner's Resend key. MANAGER/ADMIN use their own credentials.
-   */
-  private resolveEmployeeOutcomeMailSender(
-    resolverStaff: Staff,
-    leaveRequest: DbLeaveRequest,
-  ): { email: string; smtpPass: string } | null {
-    const resolveStaffCredentials = (staff: Staff): {
-      email: string;
-      smtpPass: string;
-    } | null => {
-      const email = staff.email?.trim();
-      const smtpPass = staff.smtpPass?.trim();
-      return email && smtpPass ? { email, smtpPass } : null;
-    };
-
-    if (resolverStaff.role.name === 'HEAD') {
-      return resolveStaffCredentials(leaveRequest.staff);
+    if (to.length === 0) {
+      return;
     }
 
-    return resolveStaffCredentials(resolverStaff);
+    await this.mailService.sendWithAppResend({
+      ...mailMessage,
+      to,
+    });
+  }
+
+  /** MANAGER/ADMIN outcome mail uses the resolver's Resend key (HEAD uses .env). */
+  private resolveEmployeeOutcomeMailSender(
+    resolverStaff: Staff,
+  ): { email: string; smtpPass: string } | null {
+    const email = resolverStaff.email?.trim();
+    const smtpPass = resolverStaff.smtpPass?.trim();
+    return email && smtpPass ? { email, smtpPass } : null;
   }
 
   private isValidDate(value: string): boolean {
