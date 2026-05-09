@@ -121,6 +121,33 @@ describe('LeaveRequestsService', () => {
     expect(created.requests[0].staffId).toBe(1);
   });
 
+  it('notifies each HEAD and MANAGER by sending from their own Resend credentials', async () => {
+    await leaveRequestsService.create({
+      leaveDate: '2026-05-08',
+      reason: 'Conference',
+      staffId: 1,
+      type: TypeLeave.FULL,
+    });
+
+    await new Promise<void>((resolve) => setImmediate(resolve));
+
+    expect(mailService.send).toHaveBeenCalledTimes(2);
+    expect(mailService.send).toHaveBeenCalledWith(
+      expect.objectContaining({ to: '2@company.local' }),
+      {
+        smtpUser: '2@company.local',
+        smtpPass: 'smtp-pass-2',
+      },
+    );
+    expect(mailService.send).toHaveBeenCalledWith(
+      expect.objectContaining({ to: '3@company.local' }),
+      {
+        smtpUser: '3@company.local',
+        smtpPass: 'smtp-pass-3',
+      },
+    );
+  });
+
   it('creates half-day leave request and returns decimal totalDays', async () => {
     const created = await leaveRequestsService.create({
       leaveDate: '2026-05-05',
@@ -193,8 +220,8 @@ describe('LeaveRequestsService', () => {
         subject: 'Leave request APPROVED',
       }),
       expect.objectContaining({
-        smtpUser: '2@company.local',
-        smtpPass: 'smtp-pass-2',
+        smtpUser: '1@company.local',
+        smtpPass: 'smtp-pass-1',
       }),
     );
   });
@@ -251,7 +278,7 @@ describe('LeaveRequestsService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it("uses HEAD's email when manager approves a request", async () => {
+  it("uses resolver's Resend credentials when manager approves a request", async () => {
     const created = await leaveRequestsService.create({
       leaveDate: '2026-05-07',
       reason: 'Personal work',
@@ -267,8 +294,8 @@ describe('LeaveRequestsService', () => {
         subject: 'Leave request APPROVED',
       }),
       expect.objectContaining({
-        smtpUser: '2@company.local',
-        smtpPass: 'smtp-pass-2',
+        smtpUser: '3@company.local',
+        smtpPass: 'smtp-pass-3',
       }),
     );
   });

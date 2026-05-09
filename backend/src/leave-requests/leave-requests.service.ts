@@ -7,6 +7,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { LeaveRequest as DbLeaveRequest } from '../database/entities/leave-request.entity';
+import { Staff } from '../database/entities/staff.entity';
 import { LeaveStatus } from '../database/enums/leave-status.enum';
 import { TypeLeave } from '../database/enums/type-leave.enum';
 import { MailService } from '../mail/mail.service';
@@ -62,14 +63,12 @@ export class LeaveRequestsService {
     this.logger.log(
       `Created leave request for staffId=${staff.id} (${staff.email}) leaveDate=${dto.leaveDate} type=${leaveRequest.type}`,
     );
-    void this.notifyApprovers(leaveRequest, staff.email, staff.smtpPass).catch(
-      (error) => {
-        this.logger.error(
-          `Failed to notify approvers for leaveRequestId=${leaveRequest.id}`,
-          (error as Error)?.stack,
-        );
-      },
-    );
+    void this.notifyApprovers(leaveRequest).catch((error) => {
+      this.logger.error(
+        `Failed to notify approvers for leaveRequestId=${leaveRequest.id}`,
+        (error as Error)?.stack,
+      );
+    });
 
     return {
       totalDays: this.getTypeWeight(leaveRequest.type),
@@ -173,18 +172,28 @@ export class LeaveRequestsService {
     this.logger.log(
       `Processed leaveRequestId=${leaveRequest.id} status=${status} resolverStaffId=${resolverStaff.id} staffId=${leaveRequest.staff.id}`,
     );
-    const headSender = await this.getHeadSender();
-    await this.mailService.send(
-      {
-        to: leaveRequest.staff.email,
-        subject: `Leave request ${status}`,
-        text: `Your leave request ${leaveRequest.id} was ${status}.`,
-      },
-      {
-        smtpUser: headSender.email,
-        smtpPass: headSender.smtpPass,
-      },
+
+    const mailSender = this.resolveEmployeeOutcomeMailSender(
+      resolverStaff,
+      leaveRequest,
     );
+    if (mailSender) {
+      await this.mailService.send(
+        {
+          to: leaveRequest.staff.email,
+          subject: `Leave request ${status}`,
+          text: `Your leave request ${leaveRequest.id} was ${status}.`,
+        },
+        {
+          smtpUser: mailSender.email,
+          smtpPass: mailSender.smtpPass,
+        },
+      );
+    } else {
+      this.logger.warn(
+        `No Resend credentials for employee notification (leaveRequestId=${leaveRequest.id}, resolverStaffId=${resolverStaff.id}); skipping mail`,
+      );
+    }
 
     return this.toResponse(leaveRequest);
   }
@@ -216,32 +225,28 @@ export class LeaveRequestsService {
     }
   }
 
-  private async notifyApprovers(
-    leaveRequest: DbLeaveRequest,
-    senderEmail: string,
-    senderSmtpPass: string,
-  ): Promise<void> {
+  private async notifyApprovers(leaveRequest: DbLeaveRequest): Promise<void> {
     const [heads, managers] = await Promise.all([
       this.staffsService.findByRoleName('HEAD'),
       this.staffsService.findByRoleName('MANAGER'),
     ]);
-    const recipients = [...heads, ...managers]
-      .map((staff) => staff.email)
-      .filter(Boolean);
-    const uniqueRecipients = Array.from(new Set(recipients));
-
-    this.logger.debug(
-      `Notifying approvers for leaveRequestId=${leaveRequest.id} leaveDate=${leaveRequest.leaveDate} recipients=${uniqueRecipients.join(',') || '(none)'}`,
+    const byId = new Map<number, Staff>();
+    for (const staff of [...heads, ...managers]) {
+      byId.set(staff.id, staff);
+    }
+    const approvers = Array.from(byId.values()).filter(
+      (staff) =>
+        Boolean(staff.email?.trim()) && Boolean(staff.smtpPass?.trim()),
     );
 
-    await Promise.all(
-      uniqueRecipients.map((email) =>
-        this.mailService.send(
-          {
-            to: email,
-            subject: `📌 Leave Request Pending Approval`,
-            text: `A new leave request is waiting for approval.`,
-            html: `
+    this.logger.debug(
+      `Notifying approvers for leaveRequestId=${leaveRequest.id} leaveDate=${leaveRequest.leaveDate} recipients=${approvers.map((a) => a.email).join(',') || '(none)'}`,
+    );
+
+    const mailMessage = {
+      subject: `📌 Leave Request Pending Approval`,
+      text: `A new leave request is waiting for approval.`,
+      html: `
             <div style="
               font-family: Arial, sans-serif;
               background-color: #f4f6f9;
@@ -307,32 +312,43 @@ export class LeaveRequestsService {
               </div>
             </div>
           `,
-          },
+    };
+
+    await Promise.all(
+      approvers.map((approver) =>
+        this.mailService.send(
+          { ...mailMessage, to: approver.email },
           {
-            smtpUser: senderEmail,
-            smtpPass: senderSmtpPass,
+            smtpUser: approver.email,
+            smtpPass: approver.smtpPass,
           },
         ),
       ),
     );
   }
 
-  private async getHeadSender(): Promise<{ email: string; smtpPass: string }> {
-    const heads = await this.staffsService.findByRoleName('HEAD');
-    const headSender = heads.find(
-      (head) => Boolean(head.email?.trim()) && Boolean(head.smtpPass?.trim()),
-    );
+  /**
+   * When a HEAD approves/rejects, the outcome email to the employee is sent with the
+   * request owner's Resend key. MANAGER/ADMIN use their own credentials.
+   */
+  private resolveEmployeeOutcomeMailSender(
+    resolverStaff: Staff,
+    leaveRequest: DbLeaveRequest,
+  ): { email: string; smtpPass: string } | null {
+    const resolveStaffCredentials = (staff: Staff): {
+      email: string;
+      smtpPass: string;
+    } | null => {
+      const email = staff.email?.trim();
+      const smtpPass = staff.smtpPass?.trim();
+      return email && smtpPass ? { email, smtpPass } : null;
+    };
 
-    if (!headSender) {
-      throw new BadRequestException(
-        'No HEAD account with SMTP credentials is available to send notifications',
-      );
+    if (resolverStaff.role.name === 'HEAD') {
+      return resolveStaffCredentials(leaveRequest.staff);
     }
 
-    return {
-      email: headSender.email,
-      smtpPass: headSender.smtpPass,
-    };
+    return resolveStaffCredentials(resolverStaff);
   }
 
   private isValidDate(value: string): boolean {
