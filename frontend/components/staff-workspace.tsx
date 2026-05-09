@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import type { LeaveRequestPaginationMeta } from "@/lib/leave-requests-api";
 import { leaveSessionCreditCost, leaveSessionOptions } from "@/lib/leave-session";
 import type { LeaveRequestRecord, LeaveSession, StaffRecord } from "@/types/leave-app";
@@ -36,10 +36,16 @@ export function StaffWorkspace({
   const [leaveDate, setLeaveDate] = useState("");
   const [typeLeave, setTypeLeave] = useState<LeaveSession>("FULL");
   const [reason, setReason] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const isSubmittingRef = useRef(false);
   const todayDateKey = getTodayDateKey();
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+
+    if (isSubmittingRef.current) {
+      return;
+    }
 
     if (!leaveDate || !reason.trim()) {
       toast.warning("Cần nhập ngày nghỉ và lý do.");
@@ -59,6 +65,8 @@ export function StaffWorkspace({
     }
 
     try {
+      isSubmittingRef.current = true;
+      setIsSubmitting(true);
       await onSubmit(staff.id, leaveDate, typeLeave, reason.trim());
       setLeaveDate("");
       setTypeLeave("FULL");
@@ -66,6 +74,9 @@ export function StaffWorkspace({
       toast.success("Đã gửi đơn cho HEAD duyệt.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Gửi đơn thất bại.");
+    } finally {
+      isSubmittingRef.current = false;
+      setIsSubmitting(false);
     }
   }
 
@@ -88,6 +99,7 @@ export function StaffWorkspace({
               className={inputClassName}
               lang="vi-VN"
               min={todayDateKey}
+              disabled={isSubmitting}
               onChange={(event) => setLeaveDate(event.target.value)}
               type="date"
               value={leaveDate}
@@ -98,6 +110,7 @@ export function StaffWorkspace({
             <select
               className={inputClassName}
               name="type_leave"
+              disabled={isSubmitting}
               onChange={(event) => setTypeLeave(event.target.value as LeaveSession)}
               value={typeLeave}
             >
@@ -112,12 +125,23 @@ export function StaffWorkspace({
             Lý do
             <textarea
               className={`${inputClassName} min-h-24`}
+              disabled={isSubmitting}
               onChange={(event) => setReason(event.target.value)}
               placeholder="Nhập lý do xin nghỉ"
               value={reason}
             />
           </label>
-          <button className="rounded-md bg-sky-700 px-4 py-2 text-sm font-medium text-white">
+          <button
+            className="inline-flex items-center justify-center gap-2 rounded-md bg-sky-700 px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:bg-slate-400"
+            disabled={isSubmitting}
+            type="submit"
+          >
+            {isSubmitting ? (
+              <span
+                aria-hidden="true"
+                className="h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white"
+              />
+            ) : null}
             Gửi đơn
           </button>
         </form>
