@@ -3,3 +3,7 @@
 /backend/build
 /backend/logs
 /backend/plans/*
+
+# agent
+.agent
+.agents
