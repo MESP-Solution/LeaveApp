@@ -110,7 +110,7 @@ export function LeaveRequestPopup({
         </div>
 
         {/* Content Body Grid */}
-        <div className={`mt-5 gap-5 ${canProcess ? "grid lg:grid-cols-[1.1fr_0.9fr]" : "flex flex-col"}`}>
+        <div className={`mt-5 gap-5 ${canProcess && request.status === "PENDING" ? "grid lg:grid-cols-[1.1fr_0.9fr]" : "flex flex-col"}`}>
 
           {/* Details Column */}
           <div className="flex flex-col gap-3">
@@ -209,7 +209,8 @@ export function LeaveRequestPopup({
           </div>
 
           {/* Action Approval Column */}
-          {canProcess && (
+
+          {canProcess && request.status === "PENDING" && (
             <div className="rounded-xl border border-slate-200/60 bg-slate-50/40 p-4 shadow-sm flex flex-col h-fit">
               <div className="flex items-center gap-1.5 mb-3 border-b border-slate-200/50 pb-2.5">
                 <AlertCircle className="w-4 h-4 text-slate-500" />
