@@ -46,7 +46,7 @@ export function RequestFilters({
   onChange: (filters: RequestFilterValues) => void;
 }) {
   return (
-    <div className="grid gap-3 rounded-md border border-slate-200 bg-white p-3 sm:grid-cols-3">
+    <div className="mt-2 grid gap-3 rounded-md border border-slate-200 bg-white p-3 sm:grid-cols-3">
       <label className={filterLabelClassName}>
         Tìm kiếm
         <input

@@ -15,6 +15,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "LeaveApp",
   description: "Small-company leave request management",
+  icons: {
+    icon: "/main-logo.png",
+  },
 };
 
 export default function RootLayout({

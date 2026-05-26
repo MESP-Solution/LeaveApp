@@ -8,7 +8,7 @@ import {
   type ReactNode,
 } from "react";
 
-export type AdminTab = "hr" | "leave";
+export type AdminTab = "hr" | "leave" | "dashboard";
 
 interface AdminTabContextValue {
   activeTab: AdminTab;

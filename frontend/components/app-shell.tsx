@@ -1,7 +1,8 @@
 "use client";
 
 import { useSyncExternalStore, type ReactNode } from "react";
-import { useAdminTab } from "@/lib/admin-tab-context";
+import { LogOut, LayoutDashboard, Users, CalendarMinus } from "lucide-react";
+import { useAdminTab, type AdminTab } from "@/lib/admin-tab-context";
 import { useCurrentUser } from "@/lib/current-user-context";
 import { findRoleName } from "@/lib/leave-app-helpers";
 import {
@@ -9,14 +10,12 @@ import {
   readAccessToken,
   subscribeToAuthChanges,
 } from "@/lib/session";
-import type { StaffRoleName } from "@/types/leave-app";
 
-const roleLabelByName: Record<StaffRoleName, string> = {
-  ADMIN: "Admin",
-  HEAD: "Head",
-  MANAGER: "Manager",
-  STAFF: "Nhân viên",
-};
+const NAV_TABS: { id: AdminTab; label: string; icon: React.ElementType }[] = [
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { id: "hr",        label: "Nhân sự",   icon: Users           },
+  { id: "leave",     label: "Nghỉ phép", icon: CalendarMinus   },
+];
 
 export function AppShell({ children }: { children: ReactNode }) {
   const hasToken = useSyncExternalStore(
@@ -29,7 +28,8 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const currentRole = currentUser ? findRoleName(currentUser) : undefined;
   const showAdminTabs =
-    hasToken && (currentRole === "ADMIN" || currentRole === "HEAD" || currentRole === "MANAGER");
+    hasToken &&
+    (currentRole === "ADMIN" || currentRole === "HEAD" || currentRole === "MANAGER");
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
@@ -38,94 +38,131 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#f6f7f9] text-[#172033]">
-      <header className="border-b border-slate-200 bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-4 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex-shrink-0">
-              <p className="text-sm font-medium text-slate-500">
-                Giao diện quản lý nghỉ phép
-              </p>
-              <h1 className="text-2xl font-semibold tracking-normal text-slate-950">
-                LeaveManagement
-              </h1>
-            </div>
+    <div className="min-h-screen text-slate-900" style={{ background: "oklch(98% 0.004 264)" }}>
+      <header
+        className="sticky top-0 z-40 w-full"
+        style={{
+          background: "oklch(100% 0 0)",
+          borderBottom: "1px solid oklch(92% 0.008 264)",
+        }}
+      >
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2.5 sm:gap-4 sm:py-3 sm:px-6 lg:px-8">
 
-            {showAdminTabs ? (
-              <nav
-                aria-label="Khu vực quản trị"
-                className="order-3 flex flex-1 items-center justify-center gap-8 lg:order-none lg:flex-1"
+        
+          <div className="flex shrink-0 items-center">
+            
+            <div  >
+            <p
+              className="text-2sm sm:text-base md:text-lg font-bold leading-tight tracking-tight"
+              style={{ color: "oklch(12% 0.006 264)" }}
+            >
+              LeaveManagement
+            </p>
+              <p
+                className="mt-0.5 text-[10px] leading-none"
+                style={{ color: "oklch(58% 0.006 264)" }}
               >
-                <HeaderTabButton
-                  active={activeTab === "hr"}
-                  label="Quản trị nhân sự"
-                  onClick={() => setActiveTab("hr")}
-                />
-                <HeaderTabButton
-                  active={activeTab === "leave"}
-                  label="Quản lý nghỉ phép"
-                  onClick={() => setActiveTab("leave")}
-                />
-              </nav>
-            ) : null}
-
-            {hasToken ? (
-              <div className="flex flex-shrink-0 flex-wrap items-center gap-3">
-                {currentUser ? (
-                  <div className="flex items-center gap-3">
-                    <div className="min-w-0 text-right">
-                      <p className="truncate text-sm font-semibold text-slate-950">
-                        {currentUser.fullName}
-                      </p>
-                      <p className="truncate text-xs text-slate-600">
-                        {currentUser.email}
-                      </p>
-                    </div>
-                    <span className="flex-shrink-0 rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-xs font-medium text-slate-700 whitespace-nowrap">
-                      {roleLabelByName[findRoleName(currentUser)]}
-                    </span>
-                  </div>
-                ) : null}
-                <button
-                  className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                  onClick={handleLogout}
-                  type="button"
-                >
-                  Đăng xuất
-                </button>
-              </div>
-            ) : null}
+                Quản lý nghỉ phép
+              </p>
+            </div>
           </div>
+ 
+          {showAdminTabs ? (
+            <nav
+              aria-label="Khu vực quản trị"
+              className="flex items-center gap-0.5 rounded-xl p-0.5"
+              style={{
+                background: "oklch(95.5% 0.008 264)",
+                border: "1px solid oklch(90% 0.01 264)",
+              }}
+            >
+              {NAV_TABS.map(({ id, label, icon: Icon }) => {
+                const active = activeTab === id;
+                return (
+                  <button
+                    key={id}
+                    aria-pressed={active}
+                    type="button"
+                    onClick={() => setActiveTab(id)}
+                    className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] transition-all duration-150 active:scale-[0.97] sm:px-3"
+                    style={
+                      active
+                        ? {
+                            background: "oklch(100% 0 0)",
+                            color: "oklch(14% 0.006 264)",
+                            fontWeight: 600,
+                            boxShadow:
+                              "0 1px 2px oklch(0% 0 0 / 0.07), 0 0 0 1px oklch(89% 0.012 264)",
+                          }
+                        : {
+                            background: "transparent",
+                            color: "oklch(55% 0.006 264)",
+                            fontWeight: 500,
+                          }
+                    }
+                    onMouseEnter={(e) => {
+                      if (!active) {
+                        e.currentTarget.style.background = "oklch(92% 0.009 264)";
+                        e.currentTarget.style.color = "oklch(22% 0.006 264)";
+                      }
+                    }}
+                    onMouseLeave={(e) => {
+                      if (!active) {
+                        e.currentTarget.style.background = "transparent";
+                        e.currentTarget.style.color = "oklch(55% 0.006 264)";
+                      }
+                    }}
+                  >
+                    <Icon className="h-3.5 w-3.5 shrink-0" />
+                    <span className="hidden sm:inline">{label}</span>
+                  </button>
+                );
+              })}
+            </nav>
+          ) : null}
+
+          {/* Profile + Logout */}
+          {hasToken ? (
+            <div className="flex shrink-0 items-center gap-2 sm:gap-3">
+              {currentUser && (
+                <p
+                  className="hidden max-w-[140px] truncate text-2xs underline font-semibold md:block"
+                  style={{ color: "oklch(14% 0.006 264)" }}
+                >
+                  {currentUser.fullName}
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="flex items-center justify-center gap-1.5 rounded-lg transition-all duration-150 active:scale-95"
+                style={{
+                  background: "oklch(100% 0 0)",
+                  border: "1px solid oklch(90% 0.01 264)",
+                  color: "oklch(52% 0.006 264)",
+                  padding: "5px 8px",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "oklch(97% 0.006 264)";
+                  e.currentTarget.style.color = "oklch(22% 0.006 264)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "oklch(100% 0 0)";
+                  e.currentTarget.style.color = "oklch(52% 0.006 264)";
+                }}
+              >
+                <LogOut className="h-3.5 w-3.5" />
+                <span className="hidden text-xs font-medium sm:inline">Đăng xuất</span>
+              </button>
+            </div>
+          ) : null}
+
         </div>
       </header>
-      <main className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8">
+
+      <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {children}
       </main>
     </div>
-  );
-}
-
-function HeaderTabButton({
-  active,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      aria-pressed={active}
-      className={
-        active
-          ? "relative whitespace-nowrap pb-2 text-sm font-semibold text-slate-950 after:absolute after:inset-x-0 after:-bottom-px after:h-0.5 after:bg-slate-950 after:content-['']"
-          : "relative whitespace-nowrap pb-2 text-sm font-medium text-slate-500 transition-colors hover:text-slate-900"
-      }
-      onClick={onClick}
-      type="button"
-    >
-      {label}
-    </button>
   );
 }

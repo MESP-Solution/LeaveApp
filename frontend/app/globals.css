@@ -3,6 +3,11 @@
 :root {
   --background: #f6f7f9;
   --foreground: #172033;
+
+  --error-color: #D92243;
+  --success-color: #6FAF4F;
+  --pending-color: #4BB8FA;
+
 }
 
 @theme inline {
@@ -10,8 +15,11 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
 
+  --color-error: var(--error-color);
+  --color-success: var(--success-color);
+  --color-pending: var(--pending-color);
+}
 body {
   background: var(--background);
   color: var(--foreground);
@@ -35,4 +43,31 @@ textarea:disabled {
 ::selection {
   background: #bfdbfe;
   color: #111827;
+}
+
+/* Custom Scrollbar  */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(15, 23, 51, 0.15);
+
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(15, 23, 51, 0.3);
+
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(15, 23, 51, 0.15) transparent;
 }

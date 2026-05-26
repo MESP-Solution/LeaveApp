@@ -7,8 +7,37 @@ import type { LeaveRequestPaginationMeta } from "@/lib/leave-requests-api";
 import { fetchStaffById } from "@/lib/staff-api";
 import type { LeaveRequestRecord, RoleRecord, StaffRecord } from "@/types/leave-app";
 import { RequestTable } from "./request-table";
-import { SectionHeader } from "./section-header";
 import { useToast } from "./toast";
+import { Search, UserPlus, Trash2, ChevronLeft, ChevronRight, Users } from "lucide-react";
+import { AdminCreateStaffModal } from "./admin-create-staff-modal";
+import { AdminStaffDetailModal } from "./admin-staff-detail-modal";
+import { DashboardTab } from "./dashboard-tab";
+
+const roleLabelByName: Record<string, string> = {
+  ADMIN: "Admin",
+  HEAD: "Trưởng phòng",
+  MANAGER: "Quản lý",
+  STAFF: "Nhân viên",
+};
+
+const roleConfig: Record<string, { badge: string; avatar: string }> = {
+  ADMIN: {
+    badge: "bg-indigo-950 text-indigo-50",
+    avatar: "bg-indigo-950 text-indigo-50",
+  },
+  HEAD: {
+    badge: "bg-amber-100 text-amber-900",
+    avatar: "bg-amber-100 text-amber-900",
+  },
+  MANAGER: {
+    badge: "bg-violet-100 text-violet-900",
+    avatar: "bg-violet-100 text-violet-900",
+  },
+  STAFF: {
+    badge: "bg-slate-100 text-slate-600",
+    avatar: "bg-slate-100 text-slate-600",
+  },
+};
 
 export function AdminWorkspace({
   currentRole,
@@ -54,69 +83,13 @@ export function AdminWorkspace({
   };
 }) {
   const canDeleteStaff = currentRole === "ADMIN";
-  const hasAdmin = staffs.some((staff) => findRoleName(staff) === "ADMIN");
-  const roleOptions = getRoleOptions(currentRole, hasAdmin, roles);
-  const defaultRoleId = roleOptions[0]?.value ?? 1;
-
   const toast = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [selectedStaff, setSelectedStaff] = useState<StaffRecord>();
   const [isStaffDetailOpen, setIsStaffDetailOpen] = useState(false);
   const [isLoadingStaffDetail, setIsLoadingStaffDetail] = useState(false);
   const [staffSearch, setStaffSearch] = useState("");
-  const [hiddenMailCredential, setHiddenMailCredential] = useState(() => createHiddenMailCredential());
   const { activeTab } = useAdminTab();
-  const [form, setForm] = useState({
-    fullName: "",
-    email: "",
-    password: "",
-    roleId: defaultRoleId,
-    leaveCredit: 12,
-  });
-  const selectedRoleId = roleOptions.some((option) => option.value === form.roleId)
-    ? form.roleId
-    : defaultRoleId;
-
-  async function handleCreateStaff(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-
-    if (!form.fullName.trim() || !form.email.trim() || !form.password.trim()) {
-      toast.warning("Vui lòng nhập đầy đủ họ tên, email và mật khẩu.");
-      return;
-    }
-
-    if (form.password.length < 8) {
-      toast.warning("Mật khẩu đăng nhập phải có tối thiểu 8 ký tự.");
-      return;
-    }
-
-    setIsSubmitting(true);
-    try {
-      await onCreateStaff({
-        fullName: form.fullName.trim(),
-        email: form.email.trim(),
-        password: form.password,
-        smtpPass: hiddenMailCredential,
-        roleId: Number(selectedRoleId),
-        leaveCredit: Number(form.leaveCredit),
-      });
-      setForm({
-        fullName: "",
-        email: "",
-        password: "",
-        roleId: defaultRoleId,
-        leaveCredit: 12,
-      });
-      setHiddenMailCredential(createHiddenMailCredential());
-      toast.success("Tạo nhân viên thành công.");
-      setIsCreateModalOpen(false);
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Tạo nhân viên thất bại.");
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
 
   async function handleDeleteStaff(staffId: number) {
     try {
@@ -143,7 +116,9 @@ export function AdminWorkspace({
 
   return (
     <div className="grid gap-4">
-      {activeTab === "hr" ? (
+    {activeTab === "dashboard" ? (
+  <DashboardTab requests={requests} staffs={staffs} />
+) : activeTab === "hr" ? (
         (() => {
           const trimmedSearch = staffSearch.trim().toLowerCase();
           const isSearching = trimmedSearch.length > 0;
@@ -157,106 +132,229 @@ export function AdminWorkspace({
           const displayedStaffs = isSearching ? filteredStaffs : staffsPage;
           const totalCount = isSearching
             ? filteredStaffs.length
-            : staffMeta?.totalItems ?? "-";
+            : (staffMeta?.totalItems ?? null);
 
           return (
-            <section className="flex min-h-0 flex-col rounded-md border border-slate-200 bg-white p-4">
-              <SectionHeader
-                title="Quản trị nhân sự"
-                description="Quản lý tài khoản và vai trò từ dữ liệu máy chủ."
-              />
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-md border border-slate-200 p-3">
-                <p className="text-sm text-slate-600">
-                  {isSearching ? "Kết quả tìm kiếm" : "Tổng nhân sự"}:{" "}
-                  <span className="font-medium text-slate-900">{totalCount}</span>
-                </p>
-                <button
-                  className="rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white"
-                  onClick={() => setIsCreateModalOpen(true)}
-                  type="button"
-                >
-                  Thêm nhân sự
-                </button>
+            <section className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+              {/* Panel header */}
+              <div className="border-b border-slate-100 px-6 py-5">
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+                      style={{ background: "oklch(96% 0.018 264)" }}
+                    >
+                      <Users className="h-4 w-4" style={{ color: "oklch(50% 0.18 264)" }} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <h2
+                          className="text-sm font-bold leading-none"
+                          style={{ color: "oklch(14% 0.008 264)" }}
+                        >
+                          Quản trị nhân sự
+                        </h2>
+                        {totalCount !== null && (
+                          <span
+                            className="inline-flex items-center rounded-md px-1.5 py-0.5 text-[10px] font-semibold tabular-nums"
+                            style={{
+                              background: "oklch(94% 0.025 264)",
+                              color: "oklch(46% 0.18 264)",
+                            }}
+                          >
+                            {totalCount}
+                          </span>
+                        )}
+                      </div>
+                      <p
+                        className="mt-1 text-xs leading-none"
+                        style={{ color: "oklch(58% 0.008 264)" }}
+                      >
+                        Quản lý tài khoản và vai trò từ máy chủ
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    className="shrink-0 inline-flex cursor-pointer items-center gap-1.5 rounded-xl px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition-all duration-200 active:scale-95 bg-[var(--foreground)] hover:opacity-80 hover:shadow-md"
+                    onClick={() => setIsCreateModalOpen(true)}
+                
+                   
+                    type="button"
+                  >
+                    <UserPlus className="h-3.5 w-3.5" />
+                    Thêm nhân sự
+                  </button>
+                </div>
+
+                {/* Search */}
+                <div className="relative mt-4">
+                  <div
+                    className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5"
+                    style={{ color: "oklch(65% 0.008 264)" }}
+                  >
+                    <Search className="h-3.5 w-3.5" />
+                  </div>
+                  <input
+                    className="w-full rounded-xl border py-2.5 pl-9 pr-4 text-sm outline-none transition-all duration-150"
+                    onChange={(e) => setStaffSearch(e.target.value)}
+                    placeholder="Tìm theo họ tên hoặc địa chỉ email..."
+                    type="search"
+                    value={staffSearch}
+                    style={{
+                      borderColor: "oklch(88% 0.01 264)",
+                      background: "oklch(98% 0.004 264)",
+                      color: "oklch(14% 0.008 264)",
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.borderColor = "oklch(70% 0.14 264)";
+                      e.currentTarget.style.background = "oklch(100% 0 0)";
+                      e.currentTarget.style.boxShadow = "0 0 0 3px oklch(94% 0.04 264)";
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.borderColor = "oklch(88% 0.01 264)";
+                      e.currentTarget.style.background = "oklch(98% 0.004 264)";
+                      e.currentTarget.style.boxShadow = "none";
+                    }}
+                  />
+                </div>
               </div>
 
-              <label className="mb-3 grid gap-1 text-sm font-medium text-slate-700">
-                Tìm kiếm nhân sự
-                <input
-                  className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm outline-none focus:border-sky-500"
-                  onChange={(event) => setStaffSearch(event.target.value)}
-                  placeholder="Tìm theo họ tên hoặc email"
-                  type="search"
-                  value={staffSearch}
-                />
-              </label>
-
-              {!isSearching && staffMeta && staffMeta.totalPages > 1 ? (
-                <div className="mb-3 flex items-center justify-between gap-3 text-sm text-slate-600">
-                  <p>
-                    Trang <span className="font-medium text-slate-900">{staffMeta.page}</span> /{" "}
-                    <span className="font-medium text-slate-900">{staffMeta.totalPages}</span>
+              {/* Staff rows */}
+              {displayedStaffs.length === 0 ? (
+                <div className="flex flex-col items-center justify-center px-6 py-16 text-center">
+                  <div
+                    className="mb-3 flex h-12 w-12 items-center justify-center rounded-2xl"
+                    style={{ background: "oklch(96% 0.006 264)" }}
+                  >
+                    <Search className="h-5 w-5" style={{ color: "oklch(68% 0.01 264)" }} />
+                  </div>
+                  <p className="text-sm font-semibold" style={{ color: "oklch(14% 0.008 264)" }}>
+                    {isSearching ? "Không tìm thấy kết quả" : "Chưa có nhân sự nào"}
                   </p>
-                  <div className="flex items-center gap-2">
+                  <p
+                    className="mt-1.5 max-w-xs text-xs"
+                    style={{ color: "oklch(58% 0.008 264)" }}
+                  >
+                    {isSearching
+                      ? "Không có nhân sự nào khớp với từ khóa bạn nhập."
+                      : "Thêm nhân sự đầu tiên để bắt đầu quản lý hệ thống."}
+                  </p>
+                </div>
+           ) : (
+                <div className="min-h-0 flex-1 divide-y divide-slate-100/80 overflow-y-auto">
+                  {displayedStaffs.map((staff) => {
+                    const initials = staff.fullName
+                      ? staff.fullName
+                          .split(" ")
+                          .map((n) => n[0])
+                          .join("")
+                          .slice(0, 2)
+                          .toUpperCase()
+                      : "US";
+                    const roleName = findRoleName(staff);
+                    const config = roleConfig[roleName] ?? roleConfig.STAFF;
+
+                    return (
+                      <div
+                        key={staff.id}
+                        className="group flex items-center gap-4 px-6 py-3.5 transition-colors duration-100 hover:bg-slate-50/70"
+                      >
+                        <button
+                          className="flex min-w-0 flex-1 cursor-pointer items-center gap-3.5 text-left focus:outline-none"
+                          onClick={() => void handleOpenStaffDetail(staff.id)}
+                          type="button"
+                        >
+                          <div
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${config.avatar}`}
+                          >
+                            {initials}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p
+                              className="truncate text-sm font-semibold leading-snug transition-colors duration-100 group-hover:underline"
+                              style={{ color: "oklch(14% 0.008 264)" }}
+                            >
+                              {staff.fullName}
+                            </p>
+                            <p
+                              className="mt-0.5 truncate text-xs"
+                              style={{ color: "oklch(58% 0.008 264)" }}
+                            >
+                              {staff.email}
+                            </p>
+                          </div>
+                        </button>
+
+                        <div className="flex shrink-0 items-center gap-3">
+                          <span
+                            className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${config.badge}`}
+                          >
+                            {roleLabelByName[roleName] || roleName}
+                          </span>
+                          <span
+                            className="hidden whitespace-nowrap text-[11px] sm:block"
+                            style={{ color: "oklch(65% 0.008 264)" }}
+                          >
+                            <span
+                              className="font-bold"
+                              style={{ color: "oklch(28% 0.008 264)" }}
+                            >
+                              {staff.leaveCredit}
+                            </span>{" "}
+                            ngày phép
+                          </span>
+                          {canDeleteStaff && (
+                            <button
+                              className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg text-slate-400 opacity-0 transition-all duration-150 hover:bg-rose-50 hover:text-rose-500 active:scale-95 focus:opacity-100 focus:outline-none group-hover:opacity-100"
+                              onClick={() => void handleDeleteStaff(staff.id)}
+                              title="Xóa tài khoản nhân sự"
+                              type="button"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+            )}
+              {!isSearching && staffMeta && staffMeta.totalPages > 1 && (
+                <div
+                  className="flex items-center justify-between border-t px-6 py-3.5"
+                  style={{
+                    borderColor: "oklch(93% 0.005 264)",
+                    background: "oklch(98.5% 0.004 264)",
+                  }}
+                >
+                  <p className="text-xs" style={{ color: "oklch(58% 0.008 264)" }}>
+                    Trang{" "}
+                    <span className="font-semibold" style={{ color: "oklch(20% 0.008 264)" }}>
+                      {staffMeta.page}
+                    </span>{" "}
+                    / {staffMeta.totalPages}
+                  </p>
+                  <div className="flex items-center gap-1.5">
                     <button
-                      className="rounded-md border border-slate-300 bg-white px-3 py-1 text-sm font-medium text-slate-700 disabled:bg-slate-100"
+                      aria-label="Trang trước"
+                      className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:bg-slate-100 hover:text-slate-900 active:scale-95 disabled:pointer-events-none disabled:opacity-40"
                       disabled={!staffMeta.hasPreviousPage}
                       onClick={() => onPageChange(staffMeta.page - 1)}
                       type="button"
                     >
-                      Trước
+                      <ChevronLeft className="h-3.5 w-3.5" />
                     </button>
                     <button
-                      className="rounded-md border border-slate-300 bg-white px-3 py-1 text-sm font-medium text-slate-700 disabled:bg-slate-100"
+                      aria-label="Trang sau"
+                      className="inline-flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:bg-slate-100 hover:text-slate-900 active:scale-95 disabled:pointer-events-none disabled:opacity-40"
                       disabled={!staffMeta.hasNextPage}
                       onClick={() => onPageChange(staffMeta.page + 1)}
                       type="button"
                     >
-                      Sau
+                      <ChevronRight className="h-3.5 w-3.5" />
                     </button>
                   </div>
-                </div>
-              ) : null}
-
-              {displayedStaffs.length === 0 ? (
-                <p className="rounded-md border border-dashed border-slate-200 px-3 py-6 text-center text-sm text-slate-500">
-                  {isSearching
-                    ? "Không tìm thấy nhân sự phù hợp."
-                    : "Chưa có nhân sự nào."}
-                </p>
-              ) : (
-                <div className="grid min-h-0 flex-1 gap-2 overflow-y-auto pr-1 sm:grid-cols-2 xl:grid-cols-3">
-                  {displayedStaffs.map((staff) => (
-                    <div
-                      className="flex flex-col items-start rounded-md border border-slate-200 bg-white p-2.5 text-left text-xs transition-colors hover:bg-slate-50"
-                      key={staff.id}
-                    >
-                      <button
-                        className="w-full rounded text-left focus:outline-none focus:ring-2 focus:ring-sky-500 focus:ring-offset-1"
-                        onClick={() => void handleOpenStaffDetail(staff.id)}
-                        type="button"
-                      >
-                        <div className="flex w-full items-start justify-between gap-2">
-                          <div className="min-w-0 flex-1">
-                            <p className="font-medium text-slate-950 truncate">{staff.fullName}</p>
-                            <p className="text-slate-600 truncate">{staff.email}</p>
-                          </div>
-                          <span className="flex-shrink-0 rounded border border-slate-200 bg-slate-50 px-1.5 py-0.5 font-medium text-slate-700 whitespace-nowrap">
-                            {findRoleName(staff)}
-                          </span>
-                        </div>
-                      </button>
-                      <div className="mt-1.5 flex w-full items-center justify-between gap-2">
-                        <p className="text-slate-700">Phép: <span className="font-medium">{staff.leaveCredit}</span></p>
-                        <button
-                          className={`${canDeleteStaff ? "" : "hidden"} rounded border border-rose-200 px-2 py-0.5 font-medium text-rose-700 hover:bg-rose-50`}
-                          onClick={() => void handleDeleteStaff(staff.id)}
-                          type="button"
-                        >
-                          Xóa
-                        </button>
-                      </div>
-                    </div>
-                  ))}
                 </div>
               )}
             </section>
@@ -283,206 +381,21 @@ export function AdminWorkspace({
         />
       )}
 
-      {isCreateModalOpen ? (
-        <div className={modalOverlayClassName} role="dialog" aria-modal="true">
-          <div className={modalCardClassName}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-950">Thêm nhân sự</h3>
-                <p className="mt-1 text-sm text-slate-600">Tạo nhân viên mới trong hệ thống.</p>
-              </div>
-              <button
-                className="rounded-md border border-slate-300 bg-white px-3 py-1 text-sm font-medium text-slate-700"
-                onClick={() => setIsCreateModalOpen(false)}
-                type="button"
-              >
-                Đóng
-              </button>
-            </div>
-            <form className="mt-4 grid gap-3" onSubmit={handleCreateStaff}>
-              <label className={fieldLabelClassName}>
-                Họ tên
-                <input
-                  className={inputClassName}
-                  onChange={(event) =>
-                    setForm((current) => ({ ...current, fullName: event.target.value }))
-                  }
-                  placeholder="Nhập họ tên nhân sự"
-                  title="Họ tên nhân sự"
-                  value={form.fullName}
-                />
-              </label>
-              <label className={fieldLabelClassName}>
-                Email
-                <input
-                  className={inputClassName}
-                  onChange={(event) =>
-                    setForm((current) => ({ ...current, email: event.target.value }))
-                  }
-                  placeholder="Nhập email đăng nhập"
-                  title="Email đăng nhập"
-                  type="email"
-                  value={form.email}
-                />
-              </label>
-              <label className={fieldLabelClassName}>
-                Mật khẩu
-                <input
-                  className={inputClassName}
-                  minLength={8}
-                  onChange={(event) =>
-                    setForm((current) => ({ ...current, password: event.target.value }))
-                  }
-                  placeholder="Tối thiểu 8 ký tự"
-                  title="Mật khẩu đăng nhập"
-                  type="password"
-                  value={form.password}
-                />
-              </label>
-              <label className="hidden">
-                Hidden mail credential
-                <input
-                  className={inputClassName}
-                  minLength={8}
-                  name="smtpPass"
-                  readOnly
-                  type="hidden"
-                  value={hiddenMailCredential}
-                />
-              </label>
-              <div className="grid grid-cols-2 gap-2">
-                <label className={fieldLabelClassName}>
-                  Vai trò
-                  <select
-                    className={inputClassName}
-                    onChange={(event) =>
-                      setForm((current) => ({ ...current, roleId: Number(event.target.value) }))
-                    }
-                    title="Vai trò của nhân sự"
-                    value={selectedRoleId}
-                  >
-                    {roleOptions.map((option) => (
-                      <option key={option.value} disabled={option.disabled} value={option.value}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className={fieldLabelClassName}>
-                  Ngày phép
-                  <input
-                    className={inputClassName}
-                    min={1}
-                    onChange={(event) =>
-                      setForm((current) => ({ ...current, leaveCredit: Number(event.target.value) }))
-                    }
-                    title="Số ngày phép ban đầu"
-                    type="number"
-                    value={form.leaveCredit}
-                  />
-                </label>
-              </div>
-              <button
-                className="mt-2 rounded-md bg-slate-950 px-4 py-2 text-sm font-medium text-white disabled:bg-slate-400"
-                disabled={isSubmitting}
-                type="submit"
-              >
-                {isSubmitting ? "Đang tạo..." : "Tạo nhân viên"}
-              </button>
-            </form>
-          </div>
-        </div>
-      ) : null}
+      <AdminCreateStaffModal
+        currentRole={currentRole}
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onCreateStaff={onCreateStaff}
+        roles={roles}
+        staffs={staffs}
+      />
 
-      {isStaffDetailOpen ? (
-        <div className={modalOverlayClassName} role="dialog" aria-modal="true">
-          <div className={modalCardClassName}>
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-semibold text-slate-950">Thông tin nhân sự</h3>
-                <p className="mt-1 text-sm text-slate-600">Chi tiết từ dữ liệu máy chủ.</p>
-              </div>
-              <button
-                className="rounded-md border border-slate-300 bg-white px-3 py-1 text-sm font-medium text-slate-700"
-                onClick={() => setIsStaffDetailOpen(false)}
-                type="button"
-              >
-                Đóng
-              </button>
-            </div>
-            {isLoadingStaffDetail ? (
-              <p className="mt-4 text-sm text-slate-600">Đang tải...</p>
-            ) : selectedStaff ? (
-              <div className="mt-4 grid gap-2 text-sm">
-                <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-slate-500">Họ tên</p>
-                  <p className="font-medium text-slate-950">{selectedStaff.fullName}</p>
-                </div>
-                <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-slate-500">Email</p>
-                  <p className="font-medium text-slate-950">{selectedStaff.email}</p>
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                    <p className="text-slate-500">Vai trò</p>
-                    <p className="font-medium text-slate-950">{findRoleName(selectedStaff)}</p>
-                  </div>
-                  <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                    <p className="text-slate-500">Ngày phép</p>
-                    <p className="font-medium text-slate-950">{selectedStaff.leaveCredit}</p>
-                  </div>
-                </div>
-                <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-slate-500">Mã nhân sự</p>
-                  <p className="font-medium text-slate-950">{selectedStaff.id}</p>
-                </div>
-                <div className="rounded-md border border-slate-200 bg-slate-50 p-3">
-                  <p className="text-slate-500">Ngày tạo</p>
-                  <p className="font-medium text-slate-950">{selectedStaff.createdAt}</p>
-                </div>
-              </div>
-            ) : (
-              <p className="mt-4 text-sm text-slate-600">Không có dữ liệu.</p>
-            )}
-          </div>
-        </div>
-      ) : null}
+      <AdminStaffDetailModal
+        isLoadingStaffDetail={isLoadingStaffDetail}
+        isOpen={isStaffDetailOpen}
+        onClose={() => setIsStaffDetailOpen(false)}
+        selectedStaff={selectedStaff}
+      />
     </div>
   );
-}
-
-const inputClassName =
-  "rounded-md border border-slate-300 px-3 py-2 text-sm outline-none focus:border-sky-500";
-const fieldLabelClassName = "grid gap-1 text-sm font-medium text-slate-700";
-
-const modalOverlayClassName =
-  "fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4";
-const modalCardClassName =
-  "w-full max-w-lg rounded-md border border-slate-200 bg-white p-5 shadow-xl";
-
-function getRoleOptions(
-  currentRole: "ADMIN" | "HEAD" | "MANAGER",
-  hasAdmin: boolean,
-  roles: RoleRecord[],
-): Array<{ value: number; label: string; disabled?: boolean }> {
-  const all = roles.map((role) => ({
-    value: role.id,
-    label: role.name,
-    disabled: role.name === "ADMIN" ? hasAdmin : false,
-  }));
-
-  if (currentRole === "ADMIN") {
-    return all;
-  }
-
-  if (currentRole === "MANAGER") {
-    return all.filter((opt) => opt.label === "STAFF");
-  }
-
-  return all;
-}
-
-function createHiddenMailCredential(): string {
-  const randomId = globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`;
-  return `hidden-mail-${randomId}`;
 }

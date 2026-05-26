@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Calendar, List, CheckCircle2, XCircle, HelpCircle } from "lucide-react";
 import { formatDate, formatDateTime, leaveStatusLabel } from "@/lib/formatters";
 import { findStaffName } from "@/lib/leave-app-helpers";
 import { leaveSessionLabel } from "@/lib/leave-session";
@@ -13,11 +14,7 @@ import {
 } from "./request-filters";
 import { RequestPaginationControls } from "./request-pagination-controls";
 
-const statusClasses: Record<LeaveRequestRecord["status"], string> = {
-  APPROVED: "border-emerald-200 bg-emerald-50 text-emerald-700",
-  PENDING: "border-sky-200 bg-sky-50 text-sky-700",
-  REJECTED: "border-rose-200 bg-rose-50 text-rose-700",
-};
+
 
 export function RequestTable({
   calendarRequests,
@@ -71,8 +68,8 @@ export function RequestTable({
     enableFilters
       ? clientTotalPages
       : displayedPagination && displayedPagination.total > 0
-      ? Math.max(1, Math.ceil(displayedPagination.total / pageSize))
-      : 1;
+        ? Math.max(1, Math.ceil(displayedPagination.total / pageSize))
+        : 1;
   const shouldShowPagination = enableFilters
     ? filteredRequests.length > clientPageSize
     : Boolean(displayedPagination && totalPages > 1);
@@ -80,23 +77,33 @@ export function RequestTable({
   return (
     <div className="grid gap-4">
       <div className="relative">
-        <div className="absolute right-0 top-0 z-10">
-          <div className="inline-flex overflow-hidden rounded-md border border-slate-300 bg-white shadow-sm">
+        <div className="absolute right-0 top-0 z-10 ">
+          <div className="flex items-center gap-0.5 bg-slate-100/80 p-0.5 rounded-lg border border-slate-200/40 shadow-sm">
             <button
-              className={viewMode === "calendar" ? activeTabClassName : inactiveTabClassName}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition-all duration-150 cursor-pointer
+                ${viewMode === "calendar"
+                  ? "bg-white text-slate-900 shadow-[0_1px_3px_rgba(0,0,0,0.05)] border border-slate-200/50"
+                  : "text-slate-500 hover:text-slate-900"
+                }
+              `}
               onClick={() => setViewMode("calendar")}
               type="button"
             >
-              Lịch
+              <Calendar className="w-3.5 h-3.5" />
+              <span>Lịch</span>
             </button>
             <button
-              className={`border-l border-slate-300 ${
-                viewMode === "table" ? activeTabClassName : inactiveTabClassName
-              }`}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-md text-xs font-semibold transition-all duration-150 cursor-pointer
+                ${viewMode === "table"
+                  ? "bg-white text-slate-900 shadow-[0_1px_3px_rgba(0,0,0,0.05)] border border-slate-200/50"
+                  : "text-slate-500 hover:text-slate-900"
+                }
+              `}
               onClick={() => setViewMode("table")}
               type="button"
             >
-              Bảng
+              <List className="w-3.5 h-3.5" />
+              <span>Bảng</span>
             </button>
           </div>
         </div>
@@ -123,68 +130,84 @@ export function RequestTable({
           ) : null}
 
           {viewMode === "table" ? (
-            <div className="overflow-hidden rounded-md border border-slate-200 bg-white">
-              <div className="border-b border-slate-200 px-4 py-3">
-                <h2 className="text-base font-semibold text-slate-950">{title}</h2>
+            <div className="overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm mt-2">
+              <div className="border-b border-slate-100 px-5 py-4 flex items-center justify-between">
+                <h2 className="text-sm font-bold text-slate-950 uppercase tracking-wider">{title}</h2>
               </div>
               {shouldShowPagination ? (
-                <RequestPaginationControls
-                  onPageChange={enableFilters ? setClientPage : displayedPagination!.onPageChange}
-                  page={page}
-                  totalPages={totalPages}
-                />
+                <div className="bg-slate-50/30 border-b border-slate-100 px-4 py-2">
+                  <RequestPaginationControls
+                    onPageChange={enableFilters ? setClientPage : displayedPagination!.onPageChange}
+                    page={page}
+                    totalPages={totalPages}
+                  />
+                </div>
               ) : null}
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[820px] border-collapse text-left text-sm">
-                  <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                  <thead className="bg-slate-50/70 text-xs font-semibold text-slate-500 border-b border-slate-100/80">
                     <tr>
-                      <th className="px-4 py-3 font-medium">Nhân viên</th>
-                      <th className="px-4 py-3 font-medium">Ngày nghỉ</th>
-                      <th className="px-4 py-3 font-medium">Buổi</th>
-                      <th className="px-4 py-3 font-medium">Lý do</th>
-                      <th className="px-4 py-3 font-medium">Trạng thái</th>
-                      <th className="px-4 py-3 font-medium">Xử lý</th>
+                      <th className="px-5 py-3 font-semibold">Ngày nghỉ</th>
+                      <th className="px-5 py-3 font-semibold">Buổi</th>
+                      <th className="px-5 py-3 font-semibold">Lý do nghỉ</th>
+                      <th className="px-5 py-3 font-semibold">Trạng thái</th>
+                      <th className="px-5 py-3 font-semibold">Lịch sử xử lý</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {displayedRequests.map((request) => (
                       <tr
-                        className={`align-top ${onRequestClick ? "cursor-pointer hover:bg-slate-50" : ""}`}
+                        className={`align-top transition-colors duration-150 ${onRequestClick ? "cursor-pointer hover:bg-slate-50/60" : ""}`}
                         key={request.id}
                         onClick={() => onRequestClick?.(request)}
                       >
-                        <td className="px-4 py-3 font-medium text-slate-950">
-                          {findStaffName(staffs, request.staffId)}
+                        <td className="px-5 py-3.5 font-semibold text-slate-950 font-mono text-[13px] leading-tight">
+                          {formatDate(request.leaveDate)}
                         </td>
-                        <td className="px-4 py-3 text-slate-700">{formatDate(request.leaveDate)}</td>
-                        <td className="px-4 py-3 text-slate-700">
+                        <td className="px-5 py-3.5 text-slate-600 font-medium">
                           {leaveSessionLabel(request.type_leave)}
                         </td>
-                        <td className="max-w-sm px-4 py-3 text-slate-700">
-                          {request.reason}
-                          {request.rejectReason ? (
-                            <p className="mt-2 text-xs text-rose-700">
-                              Từ chối: {request.rejectReason}
-                            </p>
-                          ) : null}
+                        <td className="max-w-sm px-5 py-3.5 text-slate-600 leading-normal font-normal">
+                          <p className="line-clamp-1 truncate" title={request.reason}>{request.reason || "-"}</p>
+                          {request.rejectReason && (
+                            <div className="mt-1.5 text-[var(--error-color)] border border-indigo-100/90 rounded-lg p-2 text-xs leading-normal">
+                              <span className="font-bold">Từ chối:</span> {request.rejectReason}
+                            </div>
+                          )}
                         </td>
-                        <td className="px-4 py-3">
-                          <span
-                            className={`inline-flex rounded-md border px-2 py-1 text-xs font-medium ${statusClasses[request.status]}`}
-                          >
-                            {leaveStatusLabel(request.status)}
+                        <td className="px-5 py-3.5">
+                          <span className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide shadow-sm ${request.status === "APPROVED"
+                            ? " py-1 text-[var(--success-color)] border-emerald-100/90"
+                            : request.status === "REJECTED"
+                              ? "border-rose-100/90 py-1 text-[var(--error-color)] "
+                              : "border-indigo-100/90 py-1 text-[var(--pending-color)]"
+                            }`}>
+                            {request.status === "APPROVED" ? (
+                              <CheckCircle2 className="w-3.5 h-3.5text-[var(--success-color)]" />
+                            ) : request.status === "REJECTED" ? (
+                              <XCircle className="w-3.5 h-3.5 text-[var(--error-color)]" />
+                            ) : (
+                              <HelpCircle className="w-3.5 h-3.5 text-[var(--pending-color)]" />
+                            )}
+                            <span>{leaveStatusLabel(request.status)}</span>
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-xs text-slate-500">
-                          <p>{findStaffName(staffs, request.resolvedBy)}</p>
-                          <p>{formatDateTime(request.resolvedAt)}</p>
+                        <td className="px-5 py-3.5 text-xs text-slate-500">
+                          {request.resolvedBy ? (
+                            <div className="space-y-1">
+                              <p className="font-semibold text-slate-800">{findStaffName(staffs, request.resolvedBy)}</p>
+                              <p className="text-[10px] text-slate-400 font-mono">{formatDateTime(request.resolvedAt)}</p>
+                            </div>
+                          ) : (
+                            <span className="text-slate-400 font-normal ">Chưa xử lý</span>
+                          )}
                         </td>
                       </tr>
                     ))}
                   </tbody>
                 </table>
                 {displayedRequests.length === 0 ? (
-                  <p className="px-4 py-6 text-sm text-slate-600">
+                  <p className="px-5 py-6 text-xs text-slate-500 font-medium italic text-center">
                     Không có đơn nào phù hợp với bộ lọc.
                   </p>
                 ) : null}
@@ -197,6 +220,4 @@ export function RequestTable({
   );
 }
 
-const activeTabClassName = "bg-slate-900 px-3 py-1 text-sm font-medium text-white";
-const inactiveTabClassName =
-  "bg-white px-3 py-1 text-sm font-medium text-slate-700 hover:bg-slate-50";
+
