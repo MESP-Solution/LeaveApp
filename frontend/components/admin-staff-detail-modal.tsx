@@ -203,8 +203,6 @@ export function AdminStaffDetailModal({
                 </div> */}
               </div>
             </div>
-
-             
           </div>
         ) : (
           <div className="py-10 text-center text-sm text-slate-500">

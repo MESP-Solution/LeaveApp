@@ -65,6 +65,14 @@ export function LeaveCalendar({
         />
 
         <div className="flex flex-wrap items-center justify-end gap-3">
+          <button className={`${navButtonClassName} bg-slate-900 text-slate-800 w-fit px-2`}
+            onClick={() => {
+              const today = new Date().toISOString().slice(0, 10);
+              setVisibleMonth(toMonthStart(today))
+              setSelectedDate(today)
+              onDateSelect?.(today)
+            }}
+          >Hôm nay</button>
           {controls}
           <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl border border-slate-250/20">
             <button
