@@ -214,7 +214,7 @@ describe('LeaveRequestsService', () => {
     expect(mailService.sendWithAppResend).toHaveBeenLastCalledWith(
       expect.objectContaining({
         to: '1@company.local',
-        subject: 'Leave request APPROVED',
+        subject: 'Đơn nghỉ phép đã được duyệt',
       }),
     );
   });
@@ -284,7 +284,7 @@ describe('LeaveRequestsService', () => {
     expect(mailService.sendWithAppResend).toHaveBeenLastCalledWith(
       expect.objectContaining({
         to: '1@company.local',
-        subject: 'Leave request APPROVED',
+        subject: 'Đơn nghỉ phép đã được duyệt',
       }),
     );
   });

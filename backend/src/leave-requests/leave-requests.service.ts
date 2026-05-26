@@ -10,6 +10,7 @@ import { LeaveRequest as DbLeaveRequest } from '../database/entities/leave-reque
 import { Staff } from '../database/entities/staff.entity';
 import { LeaveStatus } from '../database/enums/leave-status.enum';
 import { TypeLeave } from '../database/enums/type-leave.enum';
+import { approverNotificationHtml, outcomeNotificationHtml } from '../mail/email-templates';
 import { MailService } from '../mail/mail.service';
 import { StaffsService } from '../staffs/staffs.service';
 import { PaginationMetaDto } from '../common/dto/success-response.dto';
@@ -178,10 +179,19 @@ export class LeaveRequestsService {
       `Processed leaveRequestId=${leaveRequest.id} status=${status} resolverStaffId=${resolverStaff.id} staffId=${leaveRequest.staff.id}`,
     );
 
+    const approved = status === LeaveStatus.APPROVED;
     await this.mailService.sendWithAppResend({
       to: leaveRequest.staff.email,
-      subject: `Leave request ${status}`,
-      text: `Your leave request ${leaveRequest.id} was ${status}.`,
+      subject: approved ? 'Đơn nghỉ phép đã được duyệt' : 'Đơn nghỉ phép bị từ chối',
+      text: `Đơn nghỉ phép #${leaveRequest.id} đã ${approved ? 'được duyệt' : 'bị từ chối'}.`,
+      html: outcomeNotificationHtml({
+        staffName: leaveRequest.staff.fullName,
+        leaveDate: leaveRequest.leaveDate,
+        type: leaveRequest.type,
+        approved,
+        resolverName: resolverStaff.fullName,
+        rejectReason: leaveRequest.rejectReason ?? undefined,
+      }),
     });
 
     return this.toResponse(leaveRequest);
@@ -232,74 +242,14 @@ export class LeaveRequestsService {
     );
 
     const mailMessage = {
-      subject: `📌 Leave Request Pending Approval`,
-      text: `A new leave request is waiting for approval.`,
-      html: `
-            <div style="
-              font-family: Arial, sans-serif;
-              background-color: #f4f6f9;
-              padding: 24px;
-            ">
-              <div style="
-                max-width: 600px;
-                margin: auto;
-                background: white;
-                border-radius: 12px;
-                overflow: hidden;
-                box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-              ">
-                
-                <div style="
-                  background: #2563eb;
-                  color: white;
-                  padding: 20px 24px;
-                ">
-                  <h1 style="
-                    margin: 0;
-                    font-size: 22px;
-                  ">
-                    Leave Request Notification
-                  </h1>
-                </div>
-    
-                <div style="padding: 24px;">
-                  <p style="
-                    font-size: 16px;
-                    color: #374151;
-                    margin-bottom: 16px;
-                  ">
-                    A new leave request is waiting for approval.
-                  </p>
-    
-                  <div style="
-                    background: #f9fafb;
-                    border: 1px solid #e5e7eb;
-                    border-radius: 8px;
-                    padding: 16px;
-                  ">
-                    <p style="margin: 0 0 12px 0;">
-                      <strong>Employee:</strong>
-                      ${leaveRequest.staff.fullName}
-                    </p>
-    
-                    <p style="margin: 0;">
-                      <strong>Leave Date:</strong>
-                      ${leaveRequest.leaveDate}
-                    </p>
-                  </div>
-    
-                  <p style="
-                    margin-top: 24px;
-                    font-size: 14px;
-                    color: #6b7280;
-                  ">
-                    Please review this request in the management system.
-                  </p>
-                </div>
-    
-              </div>
-            </div>
-          `,
+      subject: 'Đơn nghỉ phép mới chờ duyệt',
+      text: `${leaveRequest.staff.fullName} đã gửi đơn nghỉ phép ngày ${leaveRequest.leaveDate}.`,
+      html: approverNotificationHtml({
+        staffName: leaveRequest.staff.fullName,
+        leaveDate: leaveRequest.leaveDate,
+        type: leaveRequest.type,
+        reason: leaveRequest.reason,
+      }),
     };
 
     const to = Array.from(
