@@ -77,12 +77,12 @@ export function DashboardTab({
       <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
         <div className="grid grid-cols-3 divide-x divide-slate-100 sm:grid-cols-6">
           {([
-            { label: "Nhân sự",   value: staffs.length,        icon: Users,        accent: "oklch(50% 0.18 264)" },
-            { label: "Tổng đơn",  value: total,                icon: FileText,     accent: "oklch(50% 0.15 220)" },
+            { label: "Nhân sự",   value: staffs.length,        icon: Users,        accent: "oklch(50% 0.18 264)", warn: false },
+            { label: "Tổng đơn",  value: total,                icon: FileText,     accent: "oklch(50% 0.15 220)", warn: false },
             { label: "Chờ duyệt", value: stats.pending,        icon: Clock,        accent: "oklch(62% 0.19 72)",  warn: stats.pending > 0 },
-            { label: "Đã duyệt",  value: stats.approved,       icon: CheckCircle,  accent: "oklch(54% 0.17 152)" },
-            { label: "Từ chối",   value: stats.rejected,       icon: XCircle,      accent: "oklch(57% 0.21 25)"  },
-            { label: "Ngày nghỉ", value: stats.totalLeaveDays, icon: CalendarDays, accent: "oklch(52% 0.17 300)" },
+            { label: "Đã duyệt",  value: stats.approved,       icon: CheckCircle,  accent: "oklch(54% 0.17 152)", warn: false },
+            { label: "Từ chối",   value: stats.rejected,       icon: XCircle,      accent: "oklch(57% 0.21 25)",  warn: false },
+            { label: "Ngày nghỉ", value: stats.totalLeaveDays, icon: CalendarDays, accent: "oklch(52% 0.17 300)", warn: false },
           ] as const).map(({ label, value, icon: Icon, accent, warn }) => (
             <div key={label} className="flex flex-col gap-1.5 px-5 py-4">
               <Icon className="h-4 w-4 shrink-0" style={{ color: warn ? "oklch(62% 0.19 72)" : accent }} />
