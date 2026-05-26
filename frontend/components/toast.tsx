@@ -10,6 +10,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { CheckCircle2, XCircle, AlertCircle, Info, X } from "lucide-react";
 
 export type ToastTone = "success" | "error" | "warning" | "info";
 
@@ -29,7 +30,6 @@ interface ToastApi {
 }
 
 const ToastContext = createContext<ToastApi | undefined>(undefined);
-
 const TOAST_DURATION_MS = 4500;
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -58,7 +58,6 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     [dismiss],
   );
 
-  // Clean up any pending timers when the provider unmounts.
   useEffect(() => {
     const timers = timersRef.current;
     return () => {
@@ -102,16 +101,39 @@ function ToastViewport({
   onDismiss: (id: number) => void;
   toasts: ToastItem[];
 }) {
-  if (toasts.length === 0) {
-    return null;
-  }
+  if (toasts.length === 0) return null;
 
   return (
     <div
       aria-live="polite"
-      className="pointer-events-none fixed top-4 right-4 z-[100] flex w-full max-w-sm flex-col gap-2"
+      className="pointer-events-none fixed top-4 left-4 right-4 md:left-auto md:right-4 z-[100] flex flex-col gap-2.5 w-auto md:w-full md:max-w-sm"
       role="region"
     >
+      {/* Inject premium hardware-accelerated cubic-bezier animations */}
+      <style dangerouslySetInnerHTML={{
+        __html: `
+        @keyframes toastEnter {
+          from {
+            transform: translateY(-16px) scale(0.95);
+            opacity: 0;
+          }
+          to {
+            transform: translateY(0) scale(1);
+            opacity: 1;
+          }
+        }
+        @keyframes toastProgress {
+          from { width: 100%; }
+          to { width: 0%; }
+        }
+        .animate-toast-enter {
+          animation: toastEnter 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .animate-toast-progress {
+          animation: toastProgress ${TOAST_DURATION_MS}ms linear forwards;
+        }
+      `}} />
+
       {toasts.map((toast) => (
         <ToastCard
           key={toast.id}
@@ -137,85 +159,74 @@ function ToastCard({
 
   return (
     <div
-      className={`pointer-events-auto flex items-start gap-3 rounded-md border bg-white p-3 shadow-md ${palette.border}`}
+      className={`pointer-events-auto relative overflow-hidden flex items-start gap-3.5 rounded-2xl border px-4.5 py-4 shadow-[0_10px_30px_-5px_rgba(8,13,25,0.06),0_4px_12px_-2px_rgba(8,13,25,0.03),0_0_0_1px_rgba(8,13,25,0.01)] transition-all duration-300 hover:shadow-[0_20px_40px_-5px_rgba(8,13,25,0.1)] active:scale-[0.99] animate-toast-enter ${palette.card}`}
       role="status"
     >
-      <span className={`mt-0.5 inline-flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full ${palette.iconBg}`}>
+      {/* Tone Specific Icon Container */}
+      <div className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl ${palette.iconBg} ${palette.iconText}`}>
         <ToneIcon tone={tone} />
-      </span>
-      <p className={`flex-1 text-sm leading-snug ${palette.text}`}>{message}</p>
+      </div>
+
+      {/* Message Label */}
+      <p className="flex-1 text-sm font-medium text-slate-800 leading-snug mt-1.5 pr-2">
+        {message}
+      </p>
+
+      {/* Modern Compact Dismiss Button */}
       <button
         aria-label="Đóng thông báo"
-        className="flex-shrink-0 rounded p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+        className="flex-shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-slate-100/80 hover:text-slate-700 active:scale-95 transition-all duration-150 mt-0.5"
         onClick={onDismiss}
         type="button"
       >
-        <svg aria-hidden="true" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24">
-          <path d="M6 6l12 12M6 18L18 6" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
+        <X className="h-4 w-4 stroke-[2.5]" />
       </button>
+
+      {/* Depleting Live Countdown Progress Bar */}
+      <div className={`absolute bottom-0 left-0 h-1 animate-toast-progress ${palette.bar}`} />
     </div>
   );
 }
 
 function ToneIcon({ tone }: { tone: ToastTone }) {
-  const stroke = "white";
-  const props = {
-    "aria-hidden": true,
-    className: "h-3 w-3",
-    fill: "none",
-    stroke,
-    strokeWidth: 3,
-    viewBox: "0 0 24 24",
-  } as const;
+  const props = { "aria-hidden": true, className: "h-5 w-5 stroke-[2.25]" };
 
-  if (tone === "success") {
-    return (
-      <svg {...props}>
-        <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    );
+  switch (tone) {
+    case "success":
+      return <CheckCircle2 {...props} />;
+    case "error":
+      return <XCircle {...props} />;
+    case "warning":
+      return <AlertCircle {...props} />;
+    case "info":
+    default:
+      return <Info {...props} />;
   }
-  if (tone === "error") {
-    return (
-      <svg {...props}>
-        <path d="M6 6l12 12M6 18L18 6" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    );
-  }
-  if (tone === "warning") {
-    return (
-      <svg {...props}>
-        <path d="M12 9v4m0 4h.01" strokeLinecap="round" strokeLinejoin="round" />
-      </svg>
-    );
-  }
-  return (
-    <svg {...props}>
-      <path d="M12 8v4m0 4h.01" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
 }
 
-const tonePalette: Record<ToastTone, { border: string; text: string; iconBg: string }> = {
+const tonePalette: Record<ToastTone, { card: string; iconBg: string; iconText: string; bar: string }> = {
   success: {
-    border: "border-emerald-200",
-    text: "text-emerald-900",
-    iconBg: "bg-emerald-600",
+    card: "border-emerald-100/60 bg-white/95 backdrop-blur-md",
+    iconBg: "bg-emerald-50/70 border border-emerald-100/20",
+    iconText: "text-[var(--success-color)]",
+    bar: "bg-[var(--success-color)]",
   },
   error: {
-    border: "border-rose-200",
-    text: "text-rose-900",
-    iconBg: "bg-rose-600",
+    card: "border-rose-100/60 bg-white/95 backdrop-blur-md",
+    iconBg: "border-indigo-100/90 border border-rose-100/20",
+    iconText: "text-[var(--error-color)]",
+    bar: "bg-[var(--error-color)]",
   },
   warning: {
-    border: "border-amber-200",
-    text: "text-amber-900",
-    iconBg: "bg-amber-500",
+    card: "border-amber-100/60 bg-white/95 backdrop-blur-md",
+    iconBg: "bg-amber-50/70 border border-amber-100/20",
+    iconText: "text-amber-600",
+    bar: "bg-amber-500",
   },
   info: {
-    border: "border-sky-200",
-    text: "text-sky-900",
-    iconBg: "bg-sky-600",
+    card: "border-sky-100/60 bg-white/95 backdrop-blur-md",
+    iconBg: "bg-sky-50/70 border border-sky-100/20",
+    iconText: "text-sky-600",
+    bar: "bg-[var(--pending-color)]",
   },
 };
