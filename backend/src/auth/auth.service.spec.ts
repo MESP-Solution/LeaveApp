@@ -44,6 +44,7 @@ describe('AuthService', () => {
         id: 1,
         leaveCredit: 12,
         role: 'STAFF',
+        departmentId: null,
       },
     });
     expect(response).not.toHaveProperty('passwordHash');

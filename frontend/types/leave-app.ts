@@ -15,12 +15,19 @@ export interface RoleRecord {
   name: StaffRoleName;
 }
 
+export interface DepartmentRecord {
+  id: number;
+  name: string;
+  description?: string | null;
+}
+
 export interface StaffRecord {
   id: number;
   fullName: string;
   email: string;
   passwordHash?: string;
   roleId: number;
+  departmentId?: number | null;
   leaveCredit: number;
   createdBy?: number;
   createdAt: string;

@@ -17,7 +17,14 @@ import {
   fetchRoles,
   fetchStaffsPage,
 } from "@/lib/staff-api";
-import type { LeaveRequestRecord, LeaveSession, RoleRecord, StaffRecord } from "@/types/leave-app";
+import { fetchDepartments } from "@/lib/department-api";
+import type {
+  DepartmentRecord,
+  LeaveRequestRecord,
+  LeaveSession,
+  RoleRecord,
+  StaffRecord,
+} from "@/types/leave-app";
 import { AdminWorkspace } from "./admin-workspace";
 import { LoginScreen } from "./login-screen";
 import { Metrics } from "./metrics";
@@ -46,6 +53,7 @@ export function LeaveDashboard() {
   const { currentUser, setCurrentUser, isRestoringSession, restoreError } = useCurrentUser();
   const toast = useToast();
   const [roles, setRoles] = useState<RoleRecord[]>([]);
+  const [departments, setDepartments] = useState<DepartmentRecord[]>([]);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [selectedRequestId, setSelectedRequestId] = useState<number>();
   const [rejectNote, setRejectNote] = useState("");
@@ -54,7 +62,9 @@ export function LeaveDashboard() {
   const currentRole = currentUser ? findRoleName(currentUser) : undefined;
   const selectedRequest = requests.find((request) => request.id === selectedRequestId);
   const canProcessFromModal =
-    currentRole === "ADMIN" || currentRole === "HEAD";
+    currentRole === "ADMIN" ||
+    currentRole === "HEAD" ||
+    currentRole === "MANAGER";
 
   // Surface session-restore failures as a toast (only fires when restoreError changes).
   useEffect(() => {
@@ -133,9 +143,14 @@ export function LeaveDashboard() {
       try {
         await reloadData(currentUser);
         if (findRoleName(currentUser) !== "STAFF") {
-          const [loadedRoles] = await Promise.all([fetchRoles(), reloadAdminStaffPage(1)]);
+          const [loadedRoles, loadedDepartments] = await Promise.all([
+            fetchRoles(),
+            fetchDepartments(),
+            reloadAdminStaffPage(1),
+          ]);
           if (isActive) {
             setRoles(loadedRoles);
+            setDepartments(loadedDepartments);
           }
         }
       } catch (error) {
@@ -182,6 +197,7 @@ export function LeaveDashboard() {
     email: string;
     password: string;
     roleId?: number;
+    departmentId?: number;
     leaveCredit?: number;
   }) {
     const created = await createStaff(input);
@@ -225,6 +241,10 @@ export function LeaveDashboard() {
           onRequestsPageChange={reloadRequestsPage}
           onViewRequest={openRequestDetail}
           roles={roles}
+          departments={departments}
+          lockedDepartmentId={
+            currentRole === "MANAGER" ? currentUser.departmentId : undefined
+          }
           staffMeta={adminStaffMeta}
           requests={requests}
           requestsMeta={requestsPageMeta}

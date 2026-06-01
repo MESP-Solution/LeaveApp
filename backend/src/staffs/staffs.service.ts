@@ -2,12 +2,14 @@ import { EntityManager } from '@mikro-orm/core';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import { EntityRepository } from '@mikro-orm/mysql';
 import {
+  BadRequestException,
   ConflictException,
   Injectable,
   NotFoundException,
   ForbiddenException,
 } from '@nestjs/common';
 import * as bcrypt from 'bcrypt';
+import { Department } from '../database/entities/department.entity';
 import { LeaveRequest } from '../database/entities/leave-request.entity';
 import { Role } from '../database/entities/role.entity';
 import { Staff } from '../database/entities/staff.entity';
@@ -25,6 +27,8 @@ export class StaffsService {
     private readonly staffRepository: EntityRepository<Staff>,
     @InjectRepository(Role)
     private readonly roleRepository: EntityRepository<Role>,
+    @InjectRepository(Department)
+    private readonly departmentRepository: EntityRepository<Department>,
     @InjectRepository(LeaveRequest)
     private readonly leaveRequestRepository: EntityRepository<LeaveRequest>,
     private readonly em: EntityManager,
@@ -33,17 +37,20 @@ export class StaffsService {
   async findAll(
     page = 1,
     limit = 10,
+    requester?: AuthenticatedStaff,
   ): Promise<{ data: StaffResponseDto[]; meta: PaginationMetaDto }> {
     const safePage = Math.max(1, page);
     const safeLimit = Math.min(100, Math.max(1, limit));
     const offset = (safePage - 1) * safeLimit;
+    // HEAD and MANAGER only see staff within their own department.
+    const filter = this.buildStaffListFilter(requester);
     const [staffs, totalItems] = await Promise.all([
-      this.staffRepository.findAll({
+      this.staffRepository.find(filter, {
         limit: safeLimit,
         offset,
-        populate: ['role'],
+        populate: ['role', 'department'],
       }),
-      this.staffRepository.count({}),
+      this.staffRepository.count(filter),
     ]);
     const totalPages = totalItems === 0 ? 0 : Math.ceil(totalItems / safeLimit);
     return {
@@ -59,15 +66,30 @@ export class StaffsService {
     };
   }
 
-  async findById(id: number): Promise<StaffResponseDto> {
+  async findById(
+    id: number,
+    requester?: AuthenticatedStaff,
+  ): Promise<StaffResponseDto> {
     const staff = await this.findEntityById(id);
+    // HEAD/MANAGER may only view staff inside their own department.
+    if (requester) {
+      const role = requester.role.toUpperCase();
+      if (
+        (role === 'HEAD' || role === 'MANAGER') &&
+        staff.department?.id !== requester.departmentId
+      ) {
+        throw new ForbiddenException(
+          'You can only view staff from your own department',
+        );
+      }
+    }
     return this.toResponse(staff);
   }
 
   async findEntityById(id: number): Promise<Staff> {
     const staff = await this.staffRepository.findOne(
       { id },
-      { populate: ['role'] },
+      { populate: ['role', 'department'] },
     );
     if (!staff) {
       throw new NotFoundException('Staff not found');
@@ -79,14 +101,7 @@ export class StaffsService {
   async findByEmailWithPassword(email: string): Promise<Staff | null> {
     return this.staffRepository.findOne(
       { email: this.normalizeEmail(email) },
-      { populate: ['role'] },
-    );
-  }
-
-  async findByRoleName(roleName: string): Promise<Staff[]> {
-    return this.staffRepository.find(
-      { role: { name: roleName } },
-      { populate: ['role'] },
+      { populate: ['role', 'department'] },
     );
   }
 
@@ -108,6 +123,21 @@ export class StaffsService {
     await this.ensureEmailUnique(dto.email);
     const role = await this.resolveRole(dto.roleId);
     await this.assertCanCreateRole(creator.role, role.name);
+    // A MANAGER can only create staff inside their own department.
+    let departmentId = dto.departmentId;
+    if (creator.role.toUpperCase() === 'MANAGER') {
+      if (typeof creator.departmentId !== 'number') {
+        throw new ForbiddenException('No department assigned to your account');
+      }
+      departmentId = creator.departmentId;
+    }
+    const department = await this.resolveDepartmentForRole(
+      role.name,
+      departmentId,
+    );
+    if (department && role.name.toUpperCase() === 'HEAD') {
+      await this.ensureSingleHead(department.id);
+    }
 
     const creatorEntity = await this.findEntityById(creator.id);
 
@@ -116,6 +146,7 @@ export class StaffsService {
       email: dto.email.toLowerCase(),
       passwordHash: await this.hashPassword(dto.password),
       role,
+      department,
       leaveCredit: dto.leaveCredit ?? 12,
       createdBy: creatorEntity,
       createdAt: new Date(),
@@ -123,7 +154,7 @@ export class StaffsService {
     });
 
     await this.em.persistAndFlush(staff);
-    await this.em.populate(staff, ['role']);
+    await this.em.populate(staff, ['role', 'department']);
     return this.toResponse(staff);
   }
 
@@ -151,8 +182,27 @@ export class StaffsService {
       staff.role = await this.resolveRole(dto.roleId);
     }
 
+    if (typeof dto.departmentId === 'number') {
+      staff.department = await this.resolveDepartment(dto.departmentId);
+    }
+
+    const roleName = staff.role.name.toUpperCase();
+    if (roleName === 'ADMIN') {
+      // ADMIN does not belong to a department; clear any assignment.
+      staff.department = undefined;
+    } else {
+      // Every non-admin role must end up with a department.
+      if (!staff.department) {
+        throw new BadRequestException('Department is required for this role');
+      }
+      if (roleName === 'HEAD') {
+        // Enforce a single HEAD per department, ignoring this staff itself.
+        await this.ensureSingleHead(staff.department.id, staff.id);
+      }
+    }
+
     await this.em.flush();
-    await this.em.populate(staff, ['role']);
+    await this.em.populate(staff, ['role', 'department']);
     return this.toResponse(staff);
   }
 
@@ -163,7 +213,7 @@ export class StaffsService {
 
     const staff = await this.findEntityById(id);
 
-    if (staff.role.name === 'ADMIN') {
+    if (staff.role.name.toUpperCase() === 'ADMIN') {
       throw new ConflictException('Cannot delete an ADMIN account');
     }
 
@@ -216,6 +266,97 @@ export class StaffsService {
     return defaultRole;
   }
 
+  /**
+   * Builds the staff-list filter for the requester. HEAD and MANAGER are
+   * limited to their own department; ADMIN, STAFF, and unauthenticated
+   * (no requester) see everything.
+   */
+  private buildStaffListFilter(
+    requester?: AuthenticatedStaff,
+  ): Record<string, unknown> {
+    if (!requester) {
+      return {};
+    }
+    const role = requester.role.toUpperCase();
+    if (role === 'HEAD' || role === 'MANAGER') {
+      if (typeof requester.departmentId !== 'number') {
+        // A HEAD/MANAGER must have a department; never fall back to "see all".
+        throw new ForbiddenException('No department assigned to your account');
+      }
+      return { department: requester.departmentId };
+    }
+    return {};
+  }
+
+  /**
+   * Recipients notified for a new leave request: the HEAD(s) of the
+   * requester's department plus every ADMIN. Only those with an email.
+   */
+  async findLeaveApprovers(departmentId: number | null): Promise<Staff[]> {
+    const orFilters: Record<string, unknown>[] = [{ role: { name: 'ADMIN' } }];
+    if (typeof departmentId === 'number') {
+      orFilters.push({ role: { name: 'HEAD' }, department: departmentId });
+    }
+
+    const approvers = await this.staffRepository.find(
+      { $or: orFilters },
+      { populate: ['role', 'department'] },
+    );
+    return approvers.filter((staff) => Boolean(staff.email?.trim()));
+  }
+
+  private async resolveDepartment(departmentId: number): Promise<Department> {
+    const department = await this.departmentRepository.findOne({
+      id: departmentId,
+    });
+    if (!department) {
+      throw new NotFoundException('Department not found');
+    }
+
+    return department;
+  }
+
+  /**
+   * ADMIN is exempt from departments (returns undefined even if an id is sent).
+   * Every other role must be assigned to an existing department.
+   */
+  private async resolveDepartmentForRole(
+    roleName: string,
+    departmentId?: number,
+  ): Promise<Department | undefined> {
+    if (roleName.toUpperCase() === 'ADMIN') {
+      return undefined;
+    }
+
+    if (!departmentId) {
+      throw new BadRequestException('Department is required for this role');
+    }
+
+    return this.resolveDepartment(departmentId);
+  }
+
+  /**
+   * Guarantees a department has at most one HEAD. Pass excludeStaffId when
+   * updating an existing staff so the staff is not counted against itself.
+   */
+  private async ensureSingleHead(
+    departmentId: number,
+    excludeStaffId?: number,
+  ): Promise<void> {
+    const where: Record<string, unknown> = {
+      role: { name: 'HEAD' },
+      department: departmentId,
+    };
+    if (typeof excludeStaffId === 'number') {
+      where.id = { $ne: excludeStaffId };
+    }
+
+    const existingHead = await this.staffRepository.count(where);
+    if (existingHead > 0) {
+      throw new ConflictException('Department already has a HEAD');
+    }
+  }
+
   private async ensureEmailUnique(email: string): Promise<void> {
     const existingStaff = await this.staffRepository.findOne({
       email: email.toLowerCase(),
@@ -240,6 +381,7 @@ export class StaffsService {
       fullName: staff.fullName,
       email: staff.email,
       role: staff.role.name,
+      department: staff.department?.name ?? null,
       leaveCredit: Number(staff.leaveCredit),
       createdAt: staff.createdAt.toISOString(),
     };

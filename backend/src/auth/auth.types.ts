@@ -4,6 +4,7 @@ export type AuthenticatedStaff = {
   id: number;
   leaveCredit: number;
   role: string;
+  departmentId: number | null;
 };
 
 export type JwtPayload = {

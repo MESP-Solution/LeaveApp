@@ -8,6 +8,7 @@ type CreateStaffInput = {
   email: string;
   password: string;
   roleId?: number;
+  departmentId?: number;
   leaveCredit?: number;
 };
 

@@ -5,7 +5,12 @@ import { useAdminTab } from "@/lib/admin-tab-context";
 import { findRoleName } from "@/lib/leave-app-helpers";
 import type { LeaveRequestPaginationMeta } from "@/lib/leave-requests-api";
 import { fetchStaffById } from "@/lib/staff-api";
-import type { LeaveRequestRecord, RoleRecord, StaffRecord } from "@/types/leave-app";
+import type {
+  DepartmentRecord,
+  LeaveRequestRecord,
+  RoleRecord,
+  StaffRecord,
+} from "@/types/leave-app";
 import { RequestTable } from "./request-table";
 import { useToast } from "./toast";
 import { Search, UserPlus, Trash2, ChevronLeft, ChevronRight, Users } from "lucide-react";
@@ -47,6 +52,8 @@ export function AdminWorkspace({
   onRequestsPageChange,
   onViewRequest,
   roles,
+  departments,
+  lockedDepartmentId,
   requests,
   requestsMeta,
   requestsPage,
@@ -60,6 +67,7 @@ export function AdminWorkspace({
     email: string;
     password: string;
     roleId?: number;
+    departmentId?: number;
     leaveCredit?: number;
   }) => Promise<void>;
   onDeleteStaff: (staffId: number) => Promise<void>;
@@ -67,6 +75,8 @@ export function AdminWorkspace({
   onRequestsPageChange: (nextPage: number) => Promise<void> | void;
   onViewRequest?: (request: LeaveRequestRecord) => void;
   roles: RoleRecord[];
+  departments: DepartmentRecord[];
+  lockedDepartmentId?: number | null;
   requests: LeaveRequestRecord[];
   requestsMeta?: LeaveRequestPaginationMeta;
   requestsPage: LeaveRequestRecord[];
@@ -386,6 +396,8 @@ export function AdminWorkspace({
         onClose={() => setIsCreateModalOpen(false)}
         onCreateStaff={onCreateStaff}
         roles={roles}
+        departments={departments}
+        lockedDepartmentId={lockedDepartmentId}
         staffs={staffs}
       />
 

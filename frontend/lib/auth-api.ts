@@ -10,6 +10,7 @@ interface LoginResponse {
     id: number;
     leaveCredit: number;
     role: StaffRoleName;
+    departmentId?: number | null;
   };
 }
 
@@ -20,6 +21,7 @@ interface AuthMeResponse {
     id: number;
     leaveCredit: number;
     role: StaffRoleName;
+    departmentId?: number | null;
   };
 }
 
@@ -109,6 +111,7 @@ function mapStaff(staff: LoginResponse["staff"]): StaffRecord {
     id: staff.id,
     leaveCredit: staff.leaveCredit,
     roleId: mapRoleNameToId(staff.role),
+    departmentId: staff.departmentId ?? null,
   };
 }
 
