@@ -44,6 +44,10 @@ const ERROR_TRANSLATIONS: Record<string, string> = {
   "No department assigned to your account": "Tài khoản của bạn chưa được gán vào phòng ban nào.",
   "Department is required for this role": "Vai trò này bắt buộc phải chọn phòng ban.",
   "Invalid email or password": "Email hoặc mật khẩu không chính xác.",
+  "Current password is incorrect": "Mật khẩu hiện tại không chính xác.",
+  "Invalid or expired OTP": "Mã OTP không đúng hoặc đã hết hạn.",
+  "Too many attempts": "Bạn đã nhập sai quá nhiều lần. Vui lòng yêu cầu mã OTP mới.",
+  "Password changed successfully": "Đổi mật khẩu thành công.",
   "You can only view staff from your own department": "Bạn chỉ có thể xem nhân sự thuộc phòng ban của mình.",
 };
 

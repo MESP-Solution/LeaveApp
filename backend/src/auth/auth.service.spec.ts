@@ -9,7 +9,10 @@ import { AuthService } from './auth.service';
 describe('AuthService', () => {
   let authService: AuthService;
   let jwtService: Pick<JwtService, 'sign'>;
-  let staffsService: Pick<StaffsService, 'findByEmailWithPassword'>;
+  let staffsService: Pick<
+    StaffsService,
+    'findByEmailWithPassword' | 'findEntityById' | 'updatePassword'
+  >;
 
   beforeEach(() => {
     jwtService = {
@@ -17,6 +20,8 @@ describe('AuthService', () => {
     };
     staffsService = {
       findByEmailWithPassword: jest.fn(),
+      findEntityById: jest.fn(),
+      updatePassword: jest.fn(),
     };
 
     authService = new AuthService(
@@ -45,6 +50,7 @@ describe('AuthService', () => {
         leaveCredit: 12,
         role: 'STAFF',
         departmentId: null,
+        department: null,
       },
     });
     expect(response).not.toHaveProperty('passwordHash');
@@ -62,6 +68,30 @@ describe('AuthService', () => {
         password: 'wrong-password',
       }),
     ).rejects.toBeInstanceOf(UnauthorizedException);
+  });
+
+  describe('changePassword', () => {
+    it('updates the password when the current password matches', async () => {
+      const staff = await createStaff('12345678');
+      jest.spyOn(staffsService, 'findEntityById').mockResolvedValue(staff);
+
+      await authService.changePassword(1, '12345678', 'newPassword123');
+
+      expect(staffsService.updatePassword).toHaveBeenCalledWith(
+        1,
+        'newPassword123',
+      );
+    });
+
+    it('rejects when the current password is incorrect', async () => {
+      const staff = await createStaff('12345678');
+      jest.spyOn(staffsService, 'findEntityById').mockResolvedValue(staff);
+
+      await expect(
+        authService.changePassword(1, 'wrong-password', 'newPassword123'),
+      ).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(staffsService.updatePassword).not.toHaveBeenCalled();
+    });
   });
 });
 

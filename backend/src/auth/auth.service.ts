@@ -22,6 +22,23 @@ export class AuthService {
     return this.createAuthResponse(staff);
   }
 
+  /**
+   * Self-service password change for a logged-in staff member. Verifies the
+   * current password (bcrypt) before applying the new one. No OTP involved.
+   */
+  async changePassword(
+    staffId: number,
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<void> {
+    const staff = await this.staffsService.findEntityById(staffId);
+    if (!(await bcrypt.compare(currentPassword, staff.passwordHash))) {
+      throw new UnauthorizedException('Current password is incorrect');
+    }
+
+    await this.staffsService.updatePassword(staffId, newPassword);
+  }
+
   createAuthResponse(staff: Staff) {
     const safeStaff = this.toAuthenticatedStaff(staff);
     const payload: JwtPayload = {

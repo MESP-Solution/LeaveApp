@@ -62,6 +62,21 @@ export function approverNotificationHtml(data: {
   return wrapLayout('#334155', 'Đơn Nghỉ Phép Chờ Duyệt', body);
 }
 
+export function otpPasswordResetHtml(data: {
+  fullName: string;
+  otp: string;
+  expiresInMinutes: number;
+}): string {
+  const body = `
+    <p style="font-size:15px;color:#334155;margin:0 0 4px">Xin chào ${data.fullName},</p>
+    <p style="font-size:14px;color:#64748b;margin:0 0 4px">Bạn vừa yêu cầu đặt lại mật khẩu. Dùng mã OTP bên dưới để tiếp tục.</p>
+    <div style="text-align:center;margin:20px 0">
+      <span style="display:inline-block;font-size:30px;font-weight:700;letter-spacing:8px;color:#1d4ed8;background:#eff6ff;border:1px solid #bfdbfe;border-radius:10px;padding:14px 24px">${data.otp}</span>
+    </div>
+    <p style="font-size:13px;color:#94a3b8;margin:8px 0 0">Mã có hiệu lực trong ${data.expiresInMinutes} phút. Nếu bạn không yêu cầu, hãy bỏ qua email này.</p>`;
+  return wrapLayout('#1d4ed8', 'Đặt Lại Mật Khẩu', body);
+}
+
 export function outcomeNotificationHtml(data: {
   staffName: string;
   leaveDate: string;
