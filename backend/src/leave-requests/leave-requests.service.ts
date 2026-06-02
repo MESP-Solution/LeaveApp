@@ -23,6 +23,10 @@ import {
   LeaveRequestStatus,
 } from './leave-request.model';
 
+// A leave request must be submitted at least this many calendar days ahead
+// of the requested leave date, counted from "today" (Asia/Ho_Chi_Minh).
+const MINIMUM_LEAVE_LEAD_DAYS = 3;
+
 @Injectable()
 export class LeaveRequestsService {
   private readonly logger = new Logger(LeaveRequestsService.name);
@@ -51,9 +55,9 @@ export class LeaveRequestsService {
     if (this.isWeekendDate(dto.leaveDate, dto.type)) {
       throw new BadRequestException('Leave date must be a business day');
     }
-    if (this.isShiftAlreadyStarted(dto.leaveDate, dto.type ?? TypeLeave.FULL)) {
+    if (this.isBeforeMinimumLeadTime(dto.leaveDate)) {
       throw new BadRequestException(
-        'Cannot create leave request because the shift has already started',
+        `Leave date must be at least ${MINIMUM_LEAVE_LEAD_DAYS} days from today`,
       );
     }
 
@@ -357,60 +361,44 @@ export class LeaveRequestsService {
     return new Date();
   }
 
-  private isShiftAlreadyStarted(leaveDate: string, type: TypeLeave): boolean {
-    const now = this.getNow();
-    const parts = new Intl.DateTimeFormat('en-US', {
+  /**
+   * Enforces the minimum lead time: the leave date must be at least
+   * MINIMUM_LEAVE_LEAD_DAYS calendar days after "today". "Today" is resolved in
+   * the Asia/Ho_Chi_Minh timezone so the cut-off matches the staff's local date
+   * regardless of the server timezone. Past dates fail naturally (they are
+   * earlier than the earliest allowed date).
+   */
+  private isBeforeMinimumLeadTime(leaveDate: string): boolean {
+    const earliestAllowed = this.addCalendarDays(
+      this.getLocalTodayDateString(),
+      MINIMUM_LEAVE_LEAD_DAYS,
+    );
+    return leaveDate < earliestAllowed;
+  }
+
+  private getLocalTodayDateString(): string {
+    // en-CA formats as YYYY-MM-DD, which is directly comparable as a string.
+    const parts = new Intl.DateTimeFormat('en-CA', {
       timeZone: 'Asia/Ho_Chi_Minh',
       year: 'numeric',
       month: '2-digit',
       day: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-      hour12: false,
-    }).formatToParts(now);
+    }).formatToParts(this.getNow());
 
-    const year = parts.find((p) => p.type === 'year')?.value;
-    const month = parts.find((p) => p.type === 'month')?.value;
-    const day = parts.find((p) => p.type === 'day')?.value;
-    const hourStr = parts.find((p) => p.type === 'hour')?.value;
-    const minuteStr = parts.find((p) => p.type === 'minute')?.value;
+    const year = parts.find((p) => p.type === 'year')?.value ?? '1970';
+    const month = parts.find((p) => p.type === 'month')?.value ?? '01';
+    const day = parts.find((p) => p.type === 'day')?.value ?? '01';
+    return `${year}-${month}-${day}`;
+  }
 
-    if (!year || !month || !day || !hourStr || !minuteStr) {
-      return false;
-    }
-
-    const currentLocalDateStr = `${year}-${month}-${day}`;
-
-    // 1. Past days are always considered started/finished
-    if (leaveDate < currentLocalDateStr) {
-      return true;
-    }
-
-    // 2. Future days are never considered started yet
-    if (leaveDate > currentLocalDateStr) {
-      return false;
-    }
-
-    // 3. Today: check specific shift start times
-    const hour = parseInt(hourStr, 10);
-    const minute = parseInt(minuteStr, 10);
-    const currentMinutes = hour * 60 + minute;
-
-    const morningShiftStart = 8 * 60 + 30; // 8:30 AM = 510
-    const afternoonShiftStart = 13 * 60 + 30; // 1:30 PM = 810
-
-    if (type === TypeLeave.MORNING) {
-      return currentMinutes >= morningShiftStart;
-    }
-    if (type === TypeLeave.AFTERNOON) {
-      return currentMinutes >= afternoonShiftStart;
-    }
-    if (type === TypeLeave.FULL) {
-      return currentMinutes >= morningShiftStart;
-    }
-
-    return false;
+  private addCalendarDays(dateStr: string, days: number): string {
+    const [year, month, day] = dateStr.split('-').map((v) => parseInt(v, 10));
+    const base = new Date(Date.UTC(year, month - 1, day));
+    base.setUTCDate(base.getUTCDate() + days);
+    const y = base.getUTCFullYear();
+    const m = String(base.getUTCMonth() + 1).padStart(2, '0');
+    const d = String(base.getUTCDate()).padStart(2, '0');
+    return `${y}-${m}-${d}`;
   }
 
   private isValidDate(value: string): boolean {

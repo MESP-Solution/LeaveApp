@@ -39,7 +39,8 @@ export function StaffWorkspace({
   const [reason, setReason] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const isSubmittingRef = useRef(false);
-  const todayDateKey = getTodayDateKey();
+  // Leave requests must be submitted at least 3 calendar days ahead.
+  const minLeaveDateKey = getMinLeaveDateKey();
 
   const isSaturday = (dateStr: string): boolean => {
     if (!dateStr) return false;
@@ -52,38 +53,10 @@ export function StaffWorkspace({
     return date.getDay() === 6;
   };
 
-  const isShiftAlreadyStartedForOption = (optionValue: string, dateStr: string): boolean => {
-    if (dateStr !== todayDateKey) return false;
-    const now = new Date();
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
-    const morningShiftStart = 8 * 60 + 30; // 8:30 AM = 510 minutes
-    const afternoonShiftStart = 13 * 60 + 30; // 1:30 PM = 810 minutes
-
-    if (optionValue === "FULL" || optionValue === "MORNING") {
-      return currentMinutes >= morningShiftStart;
-    }
-    if (optionValue === "AFTERNOON") {
-      return currentMinutes >= afternoonShiftStart;
-    }
-    return false;
-  };
-
   const handleDateChange = (dateVal: string) => {
     setLeaveDate(dateVal);
     if (isSaturday(dateVal)) {
       setTypeLeave("MORNING");
-    } else if (dateVal === todayDateKey) {
-      const now = new Date();
-      const currentMinutes = now.getHours() * 60 + now.getMinutes();
-      const morningShiftStart = 8 * 60 + 30;
-      const afternoonShiftStart = 13 * 60 + 30;
-
-      if (currentMinutes >= afternoonShiftStart) {
-        toast.warning("Tất cả các ca làm việc của ngày hôm nay đều đã bắt đầu.");
-      } else if (currentMinutes >= morningShiftStart) {
-        toast.warning("Ca sáng đã bắt đầu. Bạn chỉ có thể chọn ca chiều.");
-        setTypeLeave("AFTERNOON");
-      }
     }
   };
 
@@ -98,24 +71,9 @@ export function StaffWorkspace({
       toast.warning("Cần nhập ngày nghỉ và lý do.");
       return;
     }
-    if (leaveDate < todayDateKey) {
-      toast.warning("Chỉ được chọn ngày nghỉ từ hôm nay trở đi.");
+    if (leaveDate < minLeaveDateKey) {
+      toast.warning("Ngày nghỉ phải cách ít nhất 3 ngày kể từ hôm nay.");
       return;
-    }
-    if (leaveDate === todayDateKey) {
-      const now = new Date();
-      const currentMinutes = now.getHours() * 60 + now.getMinutes();
-      const morningShiftStart = 8 * 60 + 30;
-      const afternoonShiftStart = 13 * 60 + 30;
-
-      if ((typeLeave === "FULL" || typeLeave === "MORNING") && currentMinutes >= morningShiftStart) {
-        toast.warning("Không thể xin nghỉ phép ca sáng / cả ngày vì ca sáng đã bắt đầu (8:30 AM).");
-        return;
-      }
-      if (typeLeave === "AFTERNOON" && currentMinutes >= afternoonShiftStart) {
-        toast.warning("Không thể xin nghỉ phép ca chiều vì ca chiều đã bắt đầu (1:30 PM).");
-        return;
-      }
     }
     if (staff.leaveCredit < leaveSessionCreditCost(typeLeave)) {
       toast.warning("Nhân viên không đủ ngày phép cho lựa chọn này.");
@@ -179,13 +137,13 @@ export function StaffWorkspace({
               Ngày nghỉ phép
             </label>
             <div className="relative">
-              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
-                <Calendar className="w-4 h-4" />
+              <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-600">
+                <Calendar className="w-5 h-5" strokeWidth={2.25} />
               </div>
               <input
                 className={`${inputClassName} pl-10`}
                 lang="vi-VN"
-                min={todayDateKey}
+                min={minLeaveDateKey}
                 disabled={isSubmitting}
                 onChange={(event) => handleDateChange(event.target.value)}
                 type={leaveDate ? "date" : "text"}
@@ -215,8 +173,7 @@ export function StaffWorkspace({
                 const isSelected = typeLeave === option.value;
                 const isDisabledOption =
                   isSubmitting ||
-                  (isSaturday(leaveDate) && option.value !== "MORNING") ||
-                  isShiftAlreadyStartedForOption(option.value, leaveDate);
+                  (isSaturday(leaveDate) && option.value !== "MORNING");
                 return (
                   <button
                     key={option.value}
@@ -252,7 +209,7 @@ export function StaffWorkspace({
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
                 Lý do xin nghỉ
               </label>
-              <span className="text-xs font-medium text-slate-400 font-mono">
+              <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold text-slate-600 font-mono tabular-nums">
                 {reason.length} / 200 ký tự
               </span>
             </div>
@@ -318,7 +275,7 @@ export function StaffWorkspace({
 
       <RequestTable
         calendarRequests={requests}
-        minSelectableDate={todayDateKey}
+        minSelectableDate={minLeaveDateKey}
         onDateSelect={handleDateChange}
         onRequestClick={onViewRequest}
         pagination={
@@ -339,8 +296,12 @@ export function StaffWorkspace({
   );
 }
 
-function getTodayDateKey() {
+// Earliest selectable leave date: today + 3 calendar days (minimum lead time).
+const MINIMUM_LEAVE_LEAD_DAYS = 3;
+
+function getMinLeaveDateKey() {
   const date = new Date();
+  date.setDate(date.getDate() + MINIMUM_LEAVE_LEAD_DAYS);
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(
     date.getDate(),
   ).padStart(2, "0")}`;
