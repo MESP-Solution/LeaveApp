@@ -1,0 +1,16 @@
+{
+  "name": "leaveapp",
+  "private": true,
+  "version": "0.1.0",
+  "scripts": {
+    "install:all": "pnpm -C backend install && pnpm -C frontend install",
+    "build:all": "pnpm -C backend run build && pnpm -C frontend run build",
+    "start:backend": "pnpm -C backend run start:prod",
+    "start:frontend": "pnpm -C frontend run start -- -p 3001",
+    "pm2:start": "pm2 start pm2-ecosystem.config.cjs",
+    "pm2:stop": "pm2 stop pm2-ecosystem.config.cjs",
+    "pm2:restart": "pm2 restart pm2-ecosystem.config.cjs",
+    "pm2:logs": "pm2 logs",
+    "pm2:delete": "pm2 delete pm2-ecosystem.config.cjs"
+  }
+}
