@@ -404,7 +404,11 @@ describe('LeaveRequestsService', () => {
     expect(found.id).toBe(created.requests[0].id);
   });
 
-  describe('Shift starting time validation', () => {
+  describe('Minimum lead time validation (>= 3 calendar days)', () => {
+    const minLeadError = new BadRequestException(
+      'Leave date must be at least 3 days from today',
+    );
+
     it('blocks leave requests for a date in the past', async () => {
       jest.spyOn(leaveRequestsService as any, 'getNow').mockReturnValue(new Date('2026-05-15T09:00:00Z'));
 
@@ -415,16 +419,57 @@ describe('LeaveRequestsService', () => {
           staffId: 1,
           type: TypeLeave.FULL,
         }),
-      ).rejects.toThrow(
-        new BadRequestException('Cannot create leave request because the shift has already started'),
-      );
+      ).rejects.toThrow(minLeadError);
     });
 
-    it('allows leave requests for a date in the future', async () => {
+    it('blocks leave requests for today', async () => {
+      // Local today (Asia/Ho_Chi_Minh) = 2026-05-15.
+      jest.spyOn(leaveRequestsService as any, 'getNow').mockReturnValue(new Date('2026-05-15T01:00:00Z'));
+
+      await expect(
+        createOwnRequest({
+          leaveDate: '2026-05-15',
+          reason: 'Same day',
+          staffId: 1,
+          type: TypeLeave.FULL,
+        }),
+      ).rejects.toThrow(minLeadError);
+    });
+
+    it('blocks leave requests fewer than 3 days ahead', async () => {
+      // today (local) = 2026-05-18 (Monday); earliest allowed = 2026-05-21.
+      jest.spyOn(leaveRequestsService as any, 'getNow').mockReturnValue(new Date('2026-05-18T01:00:00Z'));
+
+      // 2026-05-20 (Wednesday) is only 2 days ahead -> blocked.
+      await expect(
+        createOwnRequest({
+          leaveDate: '2026-05-20',
+          reason: 'Too soon',
+          staffId: 1,
+          type: TypeLeave.FULL,
+        }),
+      ).rejects.toThrow(minLeadError);
+    });
+
+    it('allows leave requests exactly 3 days ahead', async () => {
+      jest.spyOn(leaveRequestsService as any, 'getNow').mockReturnValue(new Date('2026-05-15T01:00:00Z'));
+
+      // 2026-05-18 is exactly 3 days after today (2026-05-15) -> allowed.
+      const created = await createOwnRequest({
+        leaveDate: '2026-05-18',
+        reason: 'Exactly three days',
+        staffId: 1,
+        type: TypeLeave.FULL,
+      });
+
+      expect(created.requests[0].status).toBe('pending');
+    });
+
+    it('allows leave requests more than 3 days ahead', async () => {
       jest.spyOn(leaveRequestsService as any, 'getNow').mockReturnValue(new Date('2026-05-15T09:00:00Z'));
 
       const created = await createOwnRequest({
-        leaveDate: '2026-05-18',
+        leaveDate: '2026-05-25',
         reason: 'Future planning',
         staffId: 1,
         type: TypeLeave.FULL,
@@ -433,79 +478,19 @@ describe('LeaveRequestsService', () => {
       expect(created.requests[0].status).toBe('pending');
     });
 
-    it('handles today morning leave requests correctly based on 8:30 AM shift start', async () => {
-      jest.spyOn(leaveRequestsService as any, 'getNow').mockReturnValue(new Date('2026-05-15T01:15:00Z'));
-      const allowed = await createOwnRequest({
-        leaveDate: '2026-05-15',
-        reason: 'Morning appointment',
-        staffId: 1,
-        type: TypeLeave.MORNING,
-      });
-      expect(allowed.requests[0].status).toBe('pending');
+    it('uses the Asia/Ho_Chi_Minh local date for the cut-off', async () => {
+      // 2026-05-15T18:00:00Z is 2026-05-16 01:00 local -> today = 2026-05-16,
+      // so the earliest allowed date is 2026-05-19, not 2026-05-18.
+      jest.spyOn(leaveRequestsService as any, 'getNow').mockReturnValue(new Date('2026-05-15T18:00:00Z'));
 
-      dbRequests = [];
-
-      jest.spyOn(leaveRequestsService as any, 'getNow').mockReturnValue(new Date('2026-05-15T01:30:00Z'));
       await expect(
         createOwnRequest({
-          leaveDate: '2026-05-15',
-          reason: 'Morning appointment',
-          staffId: 1,
-          type: TypeLeave.MORNING,
-        }),
-      ).rejects.toThrow(
-        new BadRequestException('Cannot create leave request because the shift has already started'),
-      );
-    });
-
-    it('handles today afternoon leave requests correctly based on 1:30 PM shift start', async () => {
-      jest.spyOn(leaveRequestsService as any, 'getNow').mockReturnValue(new Date('2026-05-15T06:15:00Z'));
-      const allowed = await createOwnRequest({
-        leaveDate: '2026-05-15',
-        reason: 'Afternoon event',
-        staffId: 1,
-        type: TypeLeave.AFTERNOON,
-      });
-      expect(allowed.requests[0].status).toBe('pending');
-
-      dbRequests = [];
-
-      jest.spyOn(leaveRequestsService as any, 'getNow').mockReturnValue(new Date('2026-05-15T06:35:00Z'));
-      await expect(
-        createOwnRequest({
-          leaveDate: '2026-05-15',
-          reason: 'Afternoon event',
-          staffId: 1,
-          type: TypeLeave.AFTERNOON,
-        }),
-      ).rejects.toThrow(
-        new BadRequestException('Cannot create leave request because the shift has already started'),
-      );
-    });
-
-    it('handles today full day leave requests correctly based on 8:30 AM shift start', async () => {
-      jest.spyOn(leaveRequestsService as any, 'getNow').mockReturnValue(new Date('2026-05-15T01:00:00Z'));
-      const allowed = await createOwnRequest({
-        leaveDate: '2026-05-15',
-        reason: 'Full day trip',
-        staffId: 1,
-        type: TypeLeave.FULL,
-      });
-      expect(allowed.requests[0].status).toBe('pending');
-
-      dbRequests = [];
-
-      jest.spyOn(leaveRequestsService as any, 'getNow').mockReturnValue(new Date('2026-05-15T01:30:00Z'));
-      await expect(
-        createOwnRequest({
-          leaveDate: '2026-05-15',
-          reason: 'Full day trip',
+          leaveDate: '2026-05-18',
+          reason: 'Timezone edge',
           staffId: 1,
           type: TypeLeave.FULL,
         }),
-      ).rejects.toThrow(
-        new BadRequestException('Cannot create leave request because the shift has already started'),
-      );
+      ).rejects.toThrow(minLeadError);
     });
   });
 });

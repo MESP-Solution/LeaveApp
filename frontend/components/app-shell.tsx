@@ -1,7 +1,7 @@
 "use client";
 
-import { useSyncExternalStore, type ReactNode } from "react";
-import { LogOut, LayoutDashboard, Users, CalendarMinus } from "lucide-react";
+import { useState, useSyncExternalStore, type ReactNode } from "react";
+import { LogOut, LayoutDashboard, Users, CalendarMinus, KeyRound } from "lucide-react";
 import { useAdminTab, type AdminTab } from "@/lib/admin-tab-context";
 import { useCurrentUser } from "@/lib/current-user-context";
 import { findRoleName } from "@/lib/leave-app-helpers";
@@ -10,6 +10,7 @@ import {
   readAccessToken,
   subscribeToAuthChanges,
 } from "@/lib/session";
+import { ChangePasswordModal } from "./change-password-modal";
 
 const NAV_TABS: { id: AdminTab; label: string; icon: React.ElementType }[] = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
@@ -25,6 +26,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
   const { currentUser } = useCurrentUser();
   const { activeTab, setActiveTab } = useAdminTab();
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
 
   const currentRole = currentUser ? findRoleName(currentUser) : undefined;
   const showAdminTabs =
@@ -138,6 +140,28 @@ export function AppShell({ children }: { children: ReactNode }) {
               )}
               <button
                 type="button"
+                onClick={() => setIsChangePasswordOpen(true)}
+                className="flex items-center justify-center gap-1.5 rounded-lg transition-all duration-150 active:scale-95"
+                style={{
+                  background: "oklch(100% 0 0)",
+                  border: "1px solid oklch(90% 0.01 264)",
+                  color: "oklch(52% 0.006 264)",
+                  padding: "5px 8px",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "oklch(97% 0.006 264)";
+                  e.currentTarget.style.color = "oklch(22% 0.006 264)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "oklch(100% 0 0)";
+                  e.currentTarget.style.color = "oklch(52% 0.006 264)";
+                }}
+              >
+                <KeyRound className="h-3.5 w-3.5" />
+                <span className="hidden text-xs font-medium sm:inline">Đổi mật khẩu</span>
+              </button>
+              <button
+                type="button"
                 onClick={handleLogout}
                 className="flex items-center justify-center gap-1.5 rounded-lg transition-all duration-150 active:scale-95"
                 style={{
@@ -167,6 +191,11 @@ export function AppShell({ children }: { children: ReactNode }) {
       <main className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         {children}
       </main>
+
+      <ChangePasswordModal
+        isOpen={isChangePasswordOpen}
+        onClose={() => setIsChangePasswordOpen(false)}
+      />
     </div>
   );
 }

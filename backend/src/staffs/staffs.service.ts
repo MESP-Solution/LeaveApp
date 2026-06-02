@@ -254,6 +254,18 @@ export class StaffsService {
     await this.em.removeAndFlush(staff);
   }
 
+  /**
+   * Sets a new password for a staff member. Shared by the self-service
+   * "change password" (verified by old password) and "forgot password"
+   * (verified by OTP) flows. Hashing matches the rest of the service
+   * (bcrypt, 10 rounds).
+   */
+  async updatePassword(staffId: number, newPlainPassword: string): Promise<void> {
+    const staff = await this.findEntityById(staffId);
+    staff.passwordHash = await this.hashPassword(newPlainPassword);
+    await this.em.flush();
+  }
+
   private async resolveRole(roleId?: number): Promise<Role> {
     if (roleId) {
       const role = await this.roleRepository.findOne({ id: roleId });

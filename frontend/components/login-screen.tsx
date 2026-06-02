@@ -7,6 +7,7 @@ import type { StaffRecord } from "@/types/leave-app";
 import { useToast } from "./toast";
 import { DesktopLoginView } from "./desktop-login-view";
 import { MobileLoginView } from "./mobile-login-view";
+import { ForgotPasswordFlow } from "./forgot-password-flow";
 
 export function LoginScreen({
   onLogin,
@@ -17,6 +18,7 @@ export function LoginScreen({
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -53,6 +55,7 @@ export function LoginScreen({
           setPassword={setPassword}
           isSubmitting={isSubmitting}
           handleSubmit={handleSubmit}
+          onForgotPassword={() => setIsForgotPasswordOpen(true)}
         />
       </div>
       <div className="block md:hidden">
@@ -63,8 +66,13 @@ export function LoginScreen({
           setPassword={setPassword}
           isSubmitting={isSubmitting}
           handleSubmit={handleSubmit}
+          onForgotPassword={() => setIsForgotPasswordOpen(true)}
         />
       </div>
+      <ForgotPasswordFlow
+        isOpen={isForgotPasswordOpen}
+        onClose={() => setIsForgotPasswordOpen(false)}
+      />
     </>
   );
 }

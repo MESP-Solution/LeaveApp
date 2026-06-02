@@ -10,6 +10,7 @@ interface DesktopLoginViewProps {
   setPassword: (password: string) => void;
   isSubmitting: boolean;
   handleSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onForgotPassword: () => void;
 }
 
 export function DesktopLoginView({
@@ -19,6 +20,7 @@ export function DesktopLoginView({
   setPassword,
   isSubmitting,
   handleSubmit,
+  onForgotPassword,
 }: DesktopLoginViewProps) {
   return (
     <div className="relative min-h-[100dvh] grid grid-cols-2 bg-[#f6f7f9] overflow-hidden">
@@ -103,9 +105,18 @@ export function DesktopLoginView({
 
             {/* Password Field */}
             <div className="grid gap-1.5">
-              <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block">
-                Mật khẩu đăng nhập
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-semibold text-slate-700 uppercase tracking-wider block">
+                  Mật khẩu đăng nhập
+                </label>
+                <button
+                  type="button"
+                  onClick={onForgotPassword}
+                  className="text-xs font-medium text-slate-500 hover:text-slate-950 transition-colors"
+                >
+                  Quên mật khẩu?
+                </button>
+              </div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
                   <svg className="h-4.5 w-4.5" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">

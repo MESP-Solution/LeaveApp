@@ -11,6 +11,7 @@ interface MobileLoginViewProps {
   setPassword: (password: string) => void;
   isSubmitting: boolean;
   handleSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  onForgotPassword: () => void;
 }
 
 export function MobileLoginView({
@@ -20,6 +21,7 @@ export function MobileLoginView({
   setPassword,
   isSubmitting,
   handleSubmit,
+  onForgotPassword,
 }: MobileLoginViewProps) {
   const [showPassword, setShowPassword] = useState(false);
 
@@ -134,9 +136,19 @@ export function MobileLoginView({
 
             {/* Password Field Container */}
             <div className="space-y-1.5 group">
-              <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block transition-colors duration-200 group-focus-within:text-slate-800">
-                Mật khẩu
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block transition-colors duration-200 group-focus-within:text-slate-800">
+                  Mật khẩu
+                </label>
+                <button
+                  type="button"
+                  onClick={onForgotPassword}
+                  className="text-[11px] font-semibold text-slate-500 hover:text-slate-900 transition-colors"
+                  disabled={isSubmitting}
+                >
+                  Quên mật khẩu?
+                </button>
+              </div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 flex items-center pl-3.5 pointer-events-none text-slate-400 transition-colors duration-200 group-focus-within:text-slate-700">
                   <Lock className="h-4.5 w-4.5 stroke-[2]" />
