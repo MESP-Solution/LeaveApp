@@ -42,7 +42,7 @@ export class StaffsService {
     const safePage = Math.max(1, page);
     const safeLimit = Math.min(100, Math.max(1, limit));
     const offset = (safePage - 1) * safeLimit;
-    // HEAD and MANAGER only see staff within their own department.
+    // MANAGER only sees staff within their own department.
     const filter = this.buildStaffListFilter(requester);
     const [staffs, totalItems] = await Promise.all([
       this.staffRepository.find(filter, {
@@ -71,11 +71,19 @@ export class StaffsService {
     requester?: AuthenticatedStaff,
   ): Promise<StaffResponseDto> {
     const staff = await this.findEntityById(id);
-    // HEAD/MANAGER may only view staff inside their own department.
     if (requester) {
       const role = requester.role.toUpperCase();
+      // Hide higher-privilege roles entirely (NotFound to avoid leaking existence).
       if (
-        (role === 'HEAD' || role === 'MANAGER') &&
+        this.getHiddenRolesForRequester(role).includes(
+          staff.role.name.toUpperCase(),
+        )
+      ) {
+        throw new NotFoundException('Staff not found');
+      }
+      // MANAGER may only view staff inside their own department.
+      if (
+        role === 'MANAGER' &&
         staff.department?.id !== requester.departmentId
       ) {
         throw new ForbiddenException(
@@ -135,8 +143,8 @@ export class StaffsService {
       role.name,
       departmentId,
     );
-    if (department && role.name.toUpperCase() === 'HEAD') {
-      await this.ensureSingleHead(department.id);
+    if (department && role.name.toUpperCase() === 'MANAGER') {
+      await this.ensureSingleManager(department.id);
     }
 
     const creatorEntity = await this.findEntityById(creator.id);
@@ -195,9 +203,9 @@ export class StaffsService {
       if (!staff.department) {
         throw new BadRequestException('Department is required for this role');
       }
-      if (roleName === 'HEAD') {
-        // Enforce a single HEAD per department, ignoring this staff itself.
-        await this.ensureSingleHead(staff.department.id, staff.id);
+      if (roleName === 'MANAGER') {
+        // Enforce a single MANAGER per department, ignoring this staff itself.
+        await this.ensureSingleManager(staff.department.id, staff.id);
       }
     }
 
@@ -267,9 +275,10 @@ export class StaffsService {
   }
 
   /**
-   * Builds the staff-list filter for the requester. HEAD and MANAGER are
-   * limited to their own department; ADMIN, STAFF, and unauthenticated
-   * (no requester) see everything.
+   * Builds the staff-list filter for the requester:
+   * - MANAGER: scoped to their own department, with ADMIN accounts hidden.
+   * - STAFF: all departments, with ADMIN accounts hidden.
+   * - ADMIN / unauthenticated (no requester): no filter, sees everything.
    */
   private buildStaffListFilter(
     requester?: AuthenticatedStaff,
@@ -278,31 +287,54 @@ export class StaffsService {
       return {};
     }
     const role = requester.role.toUpperCase();
-    if (role === 'HEAD' || role === 'MANAGER') {
+    const filter: Record<string, unknown> = {};
+
+    if (role === 'MANAGER') {
       if (typeof requester.departmentId !== 'number') {
-        // A HEAD/MANAGER must have a department; never fall back to "see all".
+        // A MANAGER must have a department; never fall back to "see all".
         throw new ForbiddenException('No department assigned to your account');
       }
-      return { department: requester.departmentId };
+      filter.department = requester.departmentId;
     }
-    return {};
+
+    // Hide ADMIN accounts from MANAGER and STAFF requesters.
+    const hiddenRoles = this.getHiddenRolesForRequester(role);
+    if (hiddenRoles.length > 0) {
+      filter.role = { name: { $nin: hiddenRoles } };
+    }
+
+    return filter;
   }
 
   /**
-   * Recipients notified for a new leave request: the HEAD(s) of the
-   * requester's department plus every ADMIN. Only those with an email.
+   * Roles a requester is not allowed to see. MANAGER and STAFF never see
+   * ADMIN. ADMIN sees everyone.
+   */
+  private getHiddenRolesForRequester(role: string): string[] {
+    switch (role.toUpperCase()) {
+      case 'MANAGER':
+      case 'STAFF':
+        return ['ADMIN'];
+      default:
+        return [];
+    }
+  }
+
+  /**
+   * Recipients notified for a new leave request: the MANAGER(s) of the
+   * requester's department. Only those with an email. If the department has
+   * no manager (or the requester has no department), nobody is notified.
    */
   async findLeaveApprovers(departmentId: number | null): Promise<Staff[]> {
-    const orFilters: Record<string, unknown>[] = [{ role: { name: 'ADMIN' } }];
-    if (typeof departmentId === 'number') {
-      orFilters.push({ role: { name: 'HEAD' }, department: departmentId });
+    if (typeof departmentId !== 'number') {
+      return [];
     }
 
-    const approvers = await this.staffRepository.find(
-      { $or: orFilters },
+    const managers = await this.staffRepository.find(
+      { role: { name: 'MANAGER' }, department: departmentId },
       { populate: ['role', 'department'] },
     );
-    return approvers.filter((staff) => Boolean(staff.email?.trim()));
+    return managers.filter((staff) => Boolean(staff.email?.trim()));
   }
 
   private async resolveDepartment(departmentId: number): Promise<Department> {
@@ -336,24 +368,24 @@ export class StaffsService {
   }
 
   /**
-   * Guarantees a department has at most one HEAD. Pass excludeStaffId when
+   * Guarantees a department has at most one MANAGER. Pass excludeStaffId when
    * updating an existing staff so the staff is not counted against itself.
    */
-  private async ensureSingleHead(
+  private async ensureSingleManager(
     departmentId: number,
     excludeStaffId?: number,
   ): Promise<void> {
     const where: Record<string, unknown> = {
-      role: { name: 'HEAD' },
+      role: { name: 'MANAGER' },
       department: departmentId,
     };
     if (typeof excludeStaffId === 'number') {
       where.id = { $ne: excludeStaffId };
     }
 
-    const existingHead = await this.staffRepository.count(where);
-    if (existingHead > 0) {
-      throw new ConflictException('Department already has a HEAD');
+    const existingManager = await this.staffRepository.count(where);
+    if (existingManager > 0) {
+      throw new ConflictException('Department already has a MANAGER');
     }
   }
 
@@ -404,8 +436,7 @@ export class StaffsService {
     }
 
     const allowedTargetsByCreator: Record<string, Set<string>> = {
-      ADMIN: new Set(['ADMIN', 'HEAD', 'MANAGER', 'STAFF']),
-      HEAD: new Set(['HEAD', 'MANAGER', 'STAFF']),
+      ADMIN: new Set(['ADMIN', 'MANAGER', 'STAFF']),
       MANAGER: new Set(['STAFF']),
     };
 

@@ -97,7 +97,7 @@ export function LeaveRequestPopup({
         <div className="flex items-start justify-between gap-4 border-b border-slate-100 pb-4">
           <div>
             <h3 className="text-lg font-bold text-slate-950 tracking-tight">Chi tiết đơn nghỉ phép</h3>
-            <p className="mt-1 text-xs text-slate-500 font-semibold font-mono">Mã số đơn: #{request.id}</p>
+            <p className="mt-1 text-xs text-slate-500 font-medium">Mã số đơn: <span className="font-mono font-semibold text-slate-600">#{request.id}</span></p>
           </div>
           <button
             className="flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-900 active:scale-95 transition-all shadow-sm cursor-pointer"
@@ -136,8 +136,8 @@ export function LeaveRequestPopup({
             <div className="rounded-xl border border-slate-200/60 bg-white p-4 space-y-3.5 mt-1">
               {/* Date */}
               <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-100 leading-none">
-                <span className="text-slate-500 flex items-center gap-1.5 font-medium">
-                  <Calendar className="w-4 h-4 text-slate-400" />
+                <span className="text-slate-700 flex items-center gap-1.5 font-medium">
+                  <Calendar className="w-4 h-4 text-slate-500" />
                   Ngày nghỉ phép:
                 </span>
                 <span className="font-semibold text-slate-950 font-mono">
@@ -147,8 +147,8 @@ export function LeaveRequestPopup({
 
               {/* Session */}
               <div className="flex items-center justify-between text-xs pb-3 border-b border-slate-100 leading-none">
-                <span className="text-slate-500 flex items-center gap-1.5 font-medium">
-                  <Clock className="w-4 h-4 text-slate-400" />
+                <span className="text-slate-700 flex items-center gap-1.5 font-medium">
+                  <Clock className="w-4 h-4 text-slate-500" />
                   Buổi nghỉ:
                 </span>
                 <span className="font-semibold text-slate-950">
@@ -158,8 +158,8 @@ export function LeaveRequestPopup({
 
               {/* Status */}
               <div className="flex items-center justify-between text-xs leading-none">
-                <span className="text-slate-500 flex items-center gap-1.5 font-medium">
-                  <Sparkles className="w-4 h-4 text-slate-400" />
+                <span className="text-slate-700 flex items-center gap-1.5 font-medium">
+                  <Sparkles className="w-4 h-4 text-slate-500" />
                   Trạng thái:
                 </span>
                 <span className={`inline-flex items-center gap-1 rounded-lg border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide whitespace-nowrap shadow-sm ${statusTheme.badge}`}>
@@ -171,12 +171,12 @@ export function LeaveRequestPopup({
 
             {/* Reason block */}
             {request.reason && (
-              <div className="rounded-xl border border-indigo-100/90 bg-slate-50/30 p-3.5 flex flex-col gap-1.5 mt-1">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider leading-none">
+              <div className="rounded-xl border border-slate-200/80 bg-slate-50 p-4 flex flex-col gap-2 mt-1">
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider leading-none">
                   Lý do xin nghỉ
                 </span>
-                <div className="text-xs text-slate-700 leading-relaxed font-normal whitespace-pre-wrap pl-1 italic">
-                  &ldquo;{request.reason}&rdquo;
+                <div className="text-xs text-slate-800 leading-relaxed font-medium whitespace-pre-wrap first-letter:uppercase">
+                  {request.reason}
                 </div>
               </div>
             )}

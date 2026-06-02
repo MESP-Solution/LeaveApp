@@ -124,7 +124,7 @@ export class LeaveRequestsController {
   })
   @ApiBearerAuth('jwt')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('HEAD', 'MANAGER', 'ADMIN')
+  @Roles('MANAGER', 'ADMIN')
   @Patch(':id/approve')
   approve(
     @Param('id', ParseIntPipe) id: number,
@@ -149,7 +149,7 @@ export class LeaveRequestsController {
   })
   @ApiBearerAuth('jwt')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('HEAD', 'MANAGER', 'ADMIN')
+  @Roles('MANAGER', 'ADMIN')
   @Patch(':id/reject')
   reject(
     @Param('id', ParseIntPipe) id: number,

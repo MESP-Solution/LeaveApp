@@ -97,9 +97,8 @@ describe('LeaveRequestsService', () => {
           Promise.resolve(
             mockStaffs.filter(
               (staff) =>
-                staff.role.name === 'ADMIN' ||
-                (staff.role.name === 'HEAD' &&
-                  staff.department?.id === departmentId),
+                staff.role.name === 'MANAGER' &&
+                staff.department?.id === departmentId,
             ),
           ),
       ),
@@ -148,7 +147,7 @@ describe('LeaveRequestsService', () => {
     expect(created.requests[0].staffId).toBe(1);
   });
 
-  it('notifies only the department HEAD in one Resend request', async () => {
+  it('notifies only the department MANAGER in one Resend request', async () => {
     await createOwnRequest({
       leaveDate: '2026-05-08',
       reason: 'Conference',
@@ -159,8 +158,8 @@ describe('LeaveRequestsService', () => {
     await new Promise<void>((resolve) => setImmediate(resolve));
 
     expect(mailService.sendWithAppResend).toHaveBeenCalledTimes(1);
-    // Approvers = department HEAD(s) + ADMINs. MANAGER 3 is never an email
-    // recipient, so only HEAD 2 (same department) is notified.
+    // Recipients = the MANAGER(s) of the requester's department only (no ADMIN),
+    // so only MANAGER 2 (same department) is notified.
     expect((mailService.sendWithAppResend as jest.Mock).mock.calls[0][0].to)
       .toEqual(['2@company.local']);
   });
@@ -211,7 +210,7 @@ describe('LeaveRequestsService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('allows heads to approve pending requests', async () => {
+  it('allows managers to approve pending requests', async () => {
     const created = await createOwnRequest({
       leaveDate: '2026-05-04',
       reason: 'Personal work',
@@ -241,7 +240,7 @@ describe('LeaveRequestsService', () => {
     );
   });
 
-  it('allows heads to reject pending requests', async () => {
+  it('allows managers to reject pending requests', async () => {
     const created = await createOwnRequest({
       leaveDate: '2026-05-04',
       reason: 'Personal work',
@@ -261,7 +260,7 @@ describe('LeaveRequestsService', () => {
     expect(rejected.rejectReason).toBe('Trung lich hop');
   });
 
-  it('forbids a HEAD from another department from processing the request', async () => {
+  it('forbids a MANAGER from another department from processing the request', async () => {
     const created = await createOwnRequest({
       leaveDate: '2026-05-04',
       reason: 'Personal work',
@@ -269,7 +268,7 @@ describe('LeaveRequestsService', () => {
       type: TypeLeave.FULL,
     });
 
-    // Resolver 4 is a HEAD in department 2; staff 1 belongs to department 1.
+    // Resolver 4 is a MANAGER in department 2; staff 1 belongs to department 1.
     await expect(
       leaveRequestsService.approve(created.requests[0].id, {}, 4),
     ).rejects.toBeInstanceOf(ForbiddenException);
@@ -315,7 +314,7 @@ describe('LeaveRequestsService', () => {
       type: TypeLeave.FULL,
     });
 
-    await leaveRequestsService.approve(created.requests[0].id, {}, 3);
+    await leaveRequestsService.approve(created.requests[0].id, {}, 2);
 
     expect(mailService.sendWithAppResend).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -370,7 +369,7 @@ describe('LeaveRequestsService', () => {
     ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
-  it('forbids a HEAD from another department from viewing the request', async () => {
+  it('forbids a MANAGER from another department from viewing the request', async () => {
     const created = await createOwnRequest({
       leaveDate: '2026-05-04',
       reason: 'Personal work',
@@ -384,7 +383,7 @@ describe('LeaveRequestsService', () => {
         email: '4@company.local',
         fullName: 'Le Thi Hoa',
         leaveCredit: 12,
-        role: 'HEAD',
+        role: 'MANAGER',
         departmentId: 2,
       }),
     ).rejects.toBeInstanceOf(ForbiddenException);
@@ -511,13 +510,13 @@ describe('LeaveRequestsService', () => {
   });
 });
 
-// Staff 1-3 share department 1 so HEAD/MANAGER can process staff 1's requests.
-// Staff 4 is a HEAD in department 2 (used for the cross-department denial test).
+// Staff 2 is the sole MANAGER of department 1 and processes staff 1's requests.
+// Staff 4 is a MANAGER in department 2 (used for the cross-department denial test).
 const mockStaffs = [
   createMockStaff(1, 'Nguyen Van An', 'STAFF', 1),
-  createMockStaff(2, 'Pham Thu Ha', 'HEAD', 1),
-  createMockStaff(3, 'Tran Minh Quan', 'MANAGER', 1),
-  createMockStaff(4, 'Le Thi Hoa', 'HEAD', 2),
+  createMockStaff(2, 'Pham Thu Ha', 'MANAGER', 1),
+  createMockStaff(3, 'Tran Minh Quan', 'STAFF', 1),
+  createMockStaff(4, 'Le Thi Hoa', 'MANAGER', 2),
   // Staff 5: STAFF in department 1 with only 0.5 day of credit left.
   createMockStaff(5, 'Vu Van Kiet', 'STAFF', 1, 0.5),
 ];

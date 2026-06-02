@@ -11,6 +11,7 @@ interface LoginResponse {
     leaveCredit: number;
     role: StaffRoleName;
     departmentId?: number | null;
+    department?: string | null;
   };
 }
 
@@ -22,6 +23,7 @@ interface AuthMeResponse {
     leaveCredit: number;
     role: StaffRoleName;
     departmentId?: number | null;
+    department?: string | null;
   };
 }
 
@@ -112,6 +114,7 @@ function mapStaff(staff: LoginResponse["staff"]): StaffRecord {
     leaveCredit: staff.leaveCredit,
     roleId: mapRoleNameToId(staff.role),
     departmentId: staff.departmentId ?? null,
+    department: staff.department ?? null,
   };
 }
 

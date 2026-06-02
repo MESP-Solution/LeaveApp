@@ -83,7 +83,7 @@ export function LeaveCalendar({
             >
               <ChevronLeft className="w-4 h-4" />
             </button>
-            <p className="min-w-28 text-center text-xs font-bold text-slate-800 uppercase tracking-wider font-mono">
+            <p className="min-w-28 text-center text-xs font-medium text-slate-800 tracking-wider">
               {formatMonth(visibleMonth)}
             </p>
             <button
@@ -118,7 +118,7 @@ export function LeaveCalendar({
           return (
             <button
               className={[
-                "min-h-[88px] rounded-xl border p-3 text-left text-xs transition-all duration-150 flex flex-col justify-between relative active:scale-[0.98]",
+                "min-h-[88px] rounded-xl border p-3 text-left text-xs transition-all duration-150 flex flex-col justify-between items-start relative active:scale-[0.98]",
                 day.inMonth ? "bg-white text-slate-900" : "bg-slate-50/50 text-slate-400",
                 isSelected
                   ? "border-slate-900 bg-slate-50/[0.01] ring-1 ring-slate-900/5 shadow-[0_2px_8px_-3px_rgba(0,0,0,0.05)] font-bold"
@@ -135,31 +135,25 @@ export function LeaveCalendar({
               title={isPastSelectableDate ? "Chỉ được chọn ngày nghỉ từ hôm nay trở đi" : undefined}
               type="button"
             >
-              <div className="flex items-center justify-between w-full">
-                {isToday ? (
-                  <span className="h-5 w-5 rounded-full bg-slate-900 text-white font-semibold font-mono text-[10px] flex items-center justify-center shadow-sm" title="Hôm nay">
-                    {day.dayNumber}
-                  </span>
-                ) : (
-                  <span className={`font-semibold font-mono ${isSelected ? "text-slate-900" : ""}`}>{day.dayNumber}</span>
-                )}
-                {dayRequests.length > 0 && (
-                  <span className="text-[10px] font-semibold text-slate-400 font-mono ">
-
-                  </span>
+              <div className="flex flex-col items-start w-full">
+                <span className={`font-semibold font-mono text-sm leading-none ${isToday ? "text-blue-600" : isSelected ? "text-slate-900" : ""}`}>
+                  {day.dayNumber}
+                </span>
+                {isToday && (
+                  <span className="text-[9px] text-slate-400 font-medium leading-none mt-1">Hôm nay</span>
                 )}
               </div>
 
-              <div className="mt-2 flex flex-wrap gap-1 w-full">
+              <div className="flex flex-wrap justify-start gap-1.5 w-full mt-auto pt-2 min-h-[8px]">
                 {dayRequests.slice(0, 3).map((request) => (
                   <span
-                    className={`h-1.5 w-1.5 rounded-full border border-white ring-1 ring-slate-100 ${statusDotClasses[request.status]}`}
+                    className={`h-2 w-2 rounded-full border border-white ring-1 ring-slate-100 ${statusDotClasses[request.status]}`}
                     key={request.id}
                     title={leaveStatusLabel(request.status)}
                   />
                 ))}
                 {dayRequests.length > 3 ? (
-                  <span className="text-[9px] font-bold text-slate-400 leading-none self-center">
+                  <span className="text-[9px] font-bold text-slate-400 leading-none">
                     +{dayRequests.length - 3}
                   </span>
                 ) : null}

@@ -17,6 +17,7 @@ type StaffApiDto = {
   fullName: string;
   email: string;
   role: string;
+  department?: string | null;
   leaveCredit: number;
   createdAt: string;
 };

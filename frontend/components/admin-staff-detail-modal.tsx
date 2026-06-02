@@ -1,19 +1,17 @@
 "use client";
 
-import { X, User, Mail, Shield, Award, Hash, Calendar, Star  } from "lucide-react";
+import { X, User, Mail, Shield, Award, Hash, Calendar, Star, Building2  } from "lucide-react";
 import type { StaffRecord, StaffRoleName } from "@/types/leave-app";
 import { findRoleName } from "@/lib/leave-app-helpers";
 
 const roleLabelByName: Record<StaffRoleName, string> = {
   ADMIN: "Admin",
-  HEAD: "Trưởng phòng",
   MANAGER: "Quản lý",
   STAFF: "Nhân viên",
 };
 
 const badgeStylesByRole: Record<StaffRoleName, string> = {
   ADMIN: "bg-slate-950 text-white border-slate-950",
-  HEAD: "bg-amber-50 text-amber-700 border-amber-200/60",
   MANAGER: "bg-purple-50 text-purple-700 border-purple-200/60",
   STAFF: "bg-slate-50 text-slate-700 border-slate-200/60",
 };
@@ -160,6 +158,21 @@ export function AdminStaffDetailModal({
                   </div>
                 </div>
               </div>
+
+              {/* Department — hidden for ADMIN (admin has no department) */}
+              {roleName !== "ADMIN" && (
+                <div className="grid gap-1.5">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
+                    Phòng ban
+                  </span>
+                  <div className="flex items-center gap-2.5 rounded-lg border border-slate-150/60 bg-white px-3 py-2 text-slate-900 shadow-sm">
+                    <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
+                    <span className="font-medium text-slate-850 truncate">
+                      {selectedStaff.department ?? "—"}
+                    </span>
+                  </div>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-3">
                 {/* Staff ID */}

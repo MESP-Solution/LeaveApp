@@ -44,6 +44,7 @@ export class AuthService {
       leaveCredit: Number(staff.leaveCredit),
       role: staff.role.name,
       departmentId: staff.department?.id ?? null,
+      department: staff.department?.name ?? null,
     };
   }
 }

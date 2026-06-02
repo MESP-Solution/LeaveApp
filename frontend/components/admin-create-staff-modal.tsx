@@ -13,7 +13,6 @@ import { useToast } from "./toast";
 
 const roleLabelByName: Record<StaffRoleName, string> = {
   ADMIN: "Admin",
-  HEAD: "Trưởng phòng",
   MANAGER: "Quản lý",
   STAFF: "Nhân viên",
 };
@@ -23,7 +22,7 @@ interface AdminCreateStaffModalProps {
   onClose: () => void;
   roles: RoleRecord[];
   departments: DepartmentRecord[];
-  currentRole: "ADMIN" | "HEAD" | "MANAGER";
+  currentRole: "ADMIN" | "MANAGER";
   staffs: StaffRecord[];
   /** When set (e.g. MANAGER), the department is locked to this id. */
   lockedDepartmentId?: number | null;
@@ -69,6 +68,15 @@ export function AdminCreateStaffModal({
   // ADMIN does not belong to a department; every other role must pick one.
   const selectedRoleName = roles.find((role) => role.id === selectedRoleId)?.name;
   const isAdminRole = selectedRoleName === "ADMIN";
+  // Each department may have only one MANAGER, so when creating a MANAGER we
+  // disable departments that already have one (mirrors the backend rule).
+  const isManagerRole = selectedRoleName === "MANAGER";
+  const departmentsWithManager = new Set(
+    staffs
+      .filter((staff) => findRoleName(staff) === "MANAGER")
+      .map((staff) => staff.department)
+      .filter((name): name is string => Boolean(name)),
+  );
   // MANAGER can only create staff within their own (locked) department.
   const isDepartmentLocked = typeof lockedDepartmentId === "number";
   const effectiveDepartmentId = isAdminRole
@@ -278,11 +286,20 @@ export function AdminCreateStaffModal({
                   <option value={0} disabled>
                     {isAdminRole ? "Không áp dụng" : "Chọn phòng ban..."}
                   </option>
-                  {departments.map((department) => (
-                    <option key={department.id} value={department.id}>
-                      {department.name}
-                    </option>
-                  ))}
+                  {departments.map((department) => {
+                    const takenByManager =
+                      isManagerRole && departmentsWithManager.has(department.name);
+                    return (
+                      <option
+                        key={department.id}
+                        value={department.id}
+                        disabled={takenByManager}
+                      >
+                        {department.name}
+                        {takenByManager ? " (đã có quản lý)" : ""}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
             </div>
@@ -309,7 +326,7 @@ export function AdminCreateStaffModal({
 }
 
 function getRoleOptions(
-  currentRole: "ADMIN" | "HEAD" | "MANAGER",
+  currentRole: "ADMIN" | "MANAGER",
   hasAdmin: boolean,
   roles: RoleRecord[]
 ): Array<{ value: number; label: string; disabled?: boolean }> {
@@ -319,10 +336,7 @@ function getRoleOptions(
     disabled: role.name === "ADMIN" ? hasAdmin : false,
   }));
 
-  if (currentRole === "ADMIN") {
-    return all;
-  }
-
+  // MANAGER can only create STAFF; ADMIN can create any role.
   if (currentRole === "MANAGER") {
     return all.filter((opt) => opt.label === "STAFF");
   }

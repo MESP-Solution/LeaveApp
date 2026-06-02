@@ -27,7 +27,6 @@ import type {
 } from "@/types/leave-app";
 import { AdminWorkspace } from "./admin-workspace";
 import { LoginScreen } from "./login-screen";
-import { Metrics } from "./metrics";
 import { StaffWorkspace } from "./staff-workspace";
 import { LeaveRequestPopup } from "./popup";
 import { useToast } from "./toast";
@@ -62,9 +61,7 @@ export function LeaveDashboard() {
   const currentRole = currentUser ? findRoleName(currentUser) : undefined;
   const selectedRequest = requests.find((request) => request.id === selectedRequestId);
   const canProcessFromModal =
-    currentRole === "ADMIN" ||
-    currentRole === "HEAD" ||
-    currentRole === "MANAGER";
+    currentRole === "ADMIN" || currentRole === "MANAGER";
 
   // Surface session-restore failures as a toast (only fires when restoreError changes).
   useEffect(() => {
@@ -217,7 +214,6 @@ export function LeaveDashboard() {
 
   return (
     <div className="grid gap-6">
-      {currentRole !== "STAFF" ? <Metrics requests={requests} staffs={staffs} /> : null}
       {isLoadingData ? <p className="text-sm text-slate-600">Đang tải dữ liệu từ máy chủ...</p> : null}
 
       {currentRole === "STAFF" ? (

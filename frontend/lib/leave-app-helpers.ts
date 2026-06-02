@@ -3,7 +3,6 @@ import type { StaffRecord, StaffRoleName } from "@/types/leave-app";
 const ROLE_NAME_BY_ID: Record<number, StaffRoleName> = {
   1: "STAFF",
   2: "MANAGER",
-  3: "HEAD",
   4: "ADMIN",
 };
 

@@ -162,9 +162,9 @@ export class LeaveRequestsService {
     const resolverStaff =
       await this.staffsService.findEntityById(resolverStaffId);
     const resolverRole = resolverStaff.role.name.toUpperCase();
-    if (!['HEAD', 'MANAGER', 'ADMIN'].includes(resolverRole)) {
+    if (!['MANAGER', 'ADMIN'].includes(resolverRole)) {
       throw new ForbiddenException(
-        'Only HEAD, MANAGER, or ADMIN can process leave requests',
+        'Only MANAGER or ADMIN can process leave requests',
       );
     }
 
@@ -173,8 +173,8 @@ export class LeaveRequestsService {
       throw new BadRequestException('Leave request is already processed');
     }
 
-    // HEAD and MANAGER can only process requests from their own department.
-    if (resolverRole === 'HEAD' || resolverRole === 'MANAGER') {
+    // MANAGER can only process requests from their own department.
+    if (resolverRole === 'MANAGER') {
       const resolverDeptId = resolverStaff.department?.id;
       const requesterDeptId = leaveRequest.staff.department?.id;
       if (!resolverDeptId || resolverDeptId !== requesterDeptId) {
@@ -232,7 +232,7 @@ export class LeaveRequestsService {
   /**
    * Restricts which leave requests a requester may list:
    * - STAFF: only their own requests.
-   * - HEAD/MANAGER: only requests of staff in their department.
+   * - MANAGER: only requests of staff in their department.
    * - ADMIN: everything (optionally narrowed by staffId).
    */
   private buildListScope(
@@ -245,7 +245,7 @@ export class LeaveRequestsService {
       return { staff: requester.id };
     }
 
-    if (role === 'HEAD' || role === 'MANAGER') {
+    if (role === 'MANAGER') {
       if (typeof requester.departmentId !== 'number') {
         throw new ForbiddenException('No department assigned to your account');
       }
@@ -277,7 +277,7 @@ export class LeaveRequestsService {
       }
       return;
     }
-    // HEAD/MANAGER: same department only.
+    // MANAGER: same department only.
     if (
       typeof requester.departmentId !== 'number' ||
       leaveRequest.staff.department?.id !== requester.departmentId
@@ -316,7 +316,7 @@ export class LeaveRequestsService {
   }
 
   private async notifyApprovers(leaveRequest: DbLeaveRequest): Promise<void> {
-    // Only the HEAD(s) of the requester's department (plus ADMINs) are notified.
+    // Only the MANAGER(s) of the requester's department are notified.
     const departmentId = leaveRequest.staff.department?.id ?? null;
     const approvers =
       await this.staffsService.findLeaveApprovers(departmentId);

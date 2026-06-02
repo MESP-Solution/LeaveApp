@@ -5,6 +5,7 @@ export type AuthenticatedStaff = {
   leaveCredit: number;
   role: string;
   departmentId: number | null;
+  department?: string | null;
 };
 
 export type JwtPayload = {

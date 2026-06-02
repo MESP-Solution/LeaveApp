@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useAdminTab } from "@/lib/admin-tab-context";
+import { useCurrentUser } from "@/lib/current-user-context";
 import { findRoleName } from "@/lib/leave-app-helpers";
 import type { LeaveRequestPaginationMeta } from "@/lib/leave-requests-api";
 import { fetchStaffById } from "@/lib/staff-api";
@@ -13,14 +14,13 @@ import type {
 } from "@/types/leave-app";
 import { RequestTable } from "./request-table";
 import { useToast } from "./toast";
-import { Search, UserPlus, Trash2, ChevronLeft, ChevronRight, Users } from "lucide-react";
+import { Search, UserPlus, Trash2, ChevronLeft, ChevronRight, Users, Building2, ChevronDown } from "lucide-react";
 import { AdminCreateStaffModal } from "./admin-create-staff-modal";
 import { AdminStaffDetailModal } from "./admin-staff-detail-modal";
 import { DashboardTab } from "./dashboard-tab";
 
 const roleLabelByName: Record<string, string> = {
   ADMIN: "Admin",
-  HEAD: "Trưởng phòng",
   MANAGER: "Quản lý",
   STAFF: "Nhân viên",
 };
@@ -29,10 +29,6 @@ const roleConfig: Record<string, { badge: string; avatar: string }> = {
   ADMIN: {
     badge: "bg-indigo-950 text-indigo-50",
     avatar: "bg-indigo-950 text-indigo-50",
-  },
-  HEAD: {
-    badge: "bg-amber-100 text-amber-900",
-    avatar: "bg-amber-100 text-amber-900",
   },
   MANAGER: {
     badge: "bg-violet-100 text-violet-900",
@@ -61,7 +57,7 @@ export function AdminWorkspace({
   staffsPage,
   staffMeta,
 }: {
-  currentRole: "ADMIN" | "HEAD" | "MANAGER";
+  currentRole: "ADMIN" | "MANAGER";
   onCreateStaff: (input: {
     fullName: string;
     email: string;
@@ -98,7 +94,9 @@ export function AdminWorkspace({
   const [isStaffDetailOpen, setIsStaffDetailOpen] = useState(false);
   const [isLoadingStaffDetail, setIsLoadingStaffDetail] = useState(false);
   const [staffSearch, setStaffSearch] = useState("");
+  const [departmentFilter, setDepartmentFilter] = useState("");
   const { activeTab } = useAdminTab();
+  const { currentUser } = useCurrentUser();
 
   async function handleDeleteStaff(staffId: number) {
     try {
@@ -131,15 +129,23 @@ export function AdminWorkspace({
         (() => {
           const trimmedSearch = staffSearch.trim().toLowerCase();
           const isSearching = trimmedSearch.length > 0;
-          const filteredStaffs = isSearching
-            ? staffs.filter(
-                (staff) =>
+          const hasDepartmentFilter = departmentFilter.length > 0;
+          // Search and department filters run client-side over the full staff
+          // set; when either is active we bypass server pagination.
+          const isFiltering = isSearching || hasDepartmentFilter;
+          const filteredStaffs = isFiltering
+            ? staffs.filter((staff) => {
+                const matchesSearch =
+                  !isSearching ||
                   staff.fullName.toLowerCase().includes(trimmedSearch) ||
-                  staff.email.toLowerCase().includes(trimmedSearch),
-              )
+                  staff.email.toLowerCase().includes(trimmedSearch);
+                const matchesDepartment =
+                  !hasDepartmentFilter || staff.department === departmentFilter;
+                return matchesSearch && matchesDepartment;
+              })
             : [];
-          const displayedStaffs = isSearching ? filteredStaffs : staffsPage;
-          const totalCount = isSearching
+          const displayedStaffs = isFiltering ? filteredStaffs : staffsPage;
+          const totalCount = isFiltering
             ? filteredStaffs.length
             : (staffMeta?.totalItems ?? null);
 
@@ -196,36 +202,75 @@ export function AdminWorkspace({
                   </button>
                 </div>
 
-                {/* Search */}
-                <div className="relative mt-4">
-                  <div
-                    className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5"
-                    style={{ color: "oklch(65% 0.008 264)" }}
-                  >
-                    <Search className="h-3.5 w-3.5" />
+                {/* Search + department filter */}
+                <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+                  <div className="relative flex-1">
+                    <div
+                      className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5"
+                      style={{ color: "oklch(65% 0.008 264)" }}
+                    >
+                      <Search className="h-3.5 w-3.5" />
+                    </div>
+                    <input
+                      className="w-full rounded-xl border py-2.5 pl-9 pr-4 text-sm outline-none transition-all duration-150"
+                      onChange={(e) => setStaffSearch(e.target.value)}
+                      placeholder="Tìm theo họ tên hoặc địa chỉ email..."
+                      type="search"
+                      value={staffSearch}
+                      style={{
+                        borderColor: "oklch(88% 0.01 264)",
+                        background: "oklch(98% 0.004 264)",
+                        color: "oklch(14% 0.008 264)",
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.borderColor = "oklch(70% 0.14 264)";
+                        e.currentTarget.style.background = "oklch(100% 0 0)";
+                        e.currentTarget.style.boxShadow = "0 0 0 3px oklch(94% 0.04 264)";
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.borderColor = "oklch(88% 0.01 264)";
+                        e.currentTarget.style.background = "oklch(98% 0.004 264)";
+                        e.currentTarget.style.boxShadow = "none";
+                      }}
+                    />
                   </div>
-                  <input
-                    className="w-full rounded-xl border py-2.5 pl-9 pr-4 text-sm outline-none transition-all duration-150"
-                    onChange={(e) => setStaffSearch(e.target.value)}
-                    placeholder="Tìm theo họ tên hoặc địa chỉ email..."
-                    type="search"
-                    value={staffSearch}
-                    style={{
-                      borderColor: "oklch(88% 0.01 264)",
-                      background: "oklch(98% 0.004 264)",
-                      color: "oklch(14% 0.008 264)",
-                    }}
-                    onFocus={(e) => {
-                      e.currentTarget.style.borderColor = "oklch(70% 0.14 264)";
-                      e.currentTarget.style.background = "oklch(100% 0 0)";
-                      e.currentTarget.style.boxShadow = "0 0 0 3px oklch(94% 0.04 264)";
-                    }}
-                    onBlur={(e) => {
-                      e.currentTarget.style.borderColor = "oklch(88% 0.01 264)";
-                      e.currentTarget.style.background = "oklch(98% 0.004 264)";
-                      e.currentTarget.style.boxShadow = "none";
-                    }}
-                  />
+
+                  {/* Department filter is only useful for ADMIN; MANAGER is
+                      already scoped to a single department. */}
+                  {currentRole === "ADMIN" && (
+                    <div className="relative shrink-0 sm:w-52">
+                      <div
+                        className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5"
+                        style={{ color: "oklch(65% 0.008 264)" }}
+                      >
+                        <Building2 className="h-3.5 w-3.5" />
+                      </div>
+                      <select
+                        className="w-full cursor-pointer appearance-none rounded-xl border py-2.5 pl-9 pr-8 text-sm outline-none transition-all duration-150"
+                        onChange={(e) => setDepartmentFilter(e.target.value)}
+                        value={departmentFilter}
+                        aria-label="Lọc theo phòng ban"
+                        style={{
+                          borderColor: "oklch(88% 0.01 264)",
+                          background: "oklch(98% 0.004 264)",
+                          color: "oklch(14% 0.008 264)",
+                        }}
+                      >
+                        <option value="">Tất cả phòng ban</option>
+                        {departments.map((department) => (
+                          <option key={department.id} value={department.name}>
+                            {department.name}
+                          </option>
+                        ))}
+                      </select>
+                      <div
+                        className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3"
+                        style={{ color: "oklch(65% 0.008 264)" }}
+                      >
+                        <ChevronDown className="h-3.5 w-3.5" />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -239,14 +284,14 @@ export function AdminWorkspace({
                     <Search className="h-5 w-5" style={{ color: "oklch(68% 0.01 264)" }} />
                   </div>
                   <p className="text-sm font-semibold" style={{ color: "oklch(14% 0.008 264)" }}>
-                    {isSearching ? "Không tìm thấy kết quả" : "Chưa có nhân sự nào"}
+                    {isFiltering ? "Không tìm thấy kết quả" : "Chưa có nhân sự nào"}
                   </p>
                   <p
                     className="mt-1.5 max-w-xs text-xs"
                     style={{ color: "oklch(58% 0.008 264)" }}
                   >
-                    {isSearching
-                      ? "Không có nhân sự nào khớp với từ khóa bạn nhập."
+                    {isFiltering
+                      ? "Không có nhân sự nào khớp với điều kiện lọc."
                       : "Thêm nhân sự đầu tiên để bắt đầu quản lý hệ thống."}
                   </p>
                 </div>
@@ -263,11 +308,16 @@ export function AdminWorkspace({
                       : "US";
                     const roleName = findRoleName(staff);
                     const config = roleConfig[roleName] ?? roleConfig.STAFF;
+                    const isCurrentUser = currentUser?.id === staff.id;
 
                     return (
                       <div
                         key={staff.id}
-                        className="group flex items-center gap-4 px-6 py-3.5 transition-colors duration-100 hover:bg-slate-50/70"
+                        className={`group flex items-center gap-4 px-6 py-3.5 transition-colors duration-100 ${
+                          isCurrentUser
+                            ? "border-l-2 border-l-indigo-500 bg-indigo-50/50 hover:bg-indigo-50"
+                            : "hover:bg-slate-50/70"
+                        }`}
                       >
                         <button
                           className="flex min-w-0 flex-1 cursor-pointer items-center gap-3.5 text-left focus:outline-none"
@@ -296,6 +346,11 @@ export function AdminWorkspace({
                         </button>
 
                         <div className="flex shrink-0 items-center gap-3">
+                          {isCurrentUser && (
+                            <span className="inline-flex items-center rounded-md bg-indigo-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-indigo-700">
+                              Bạn
+                            </span>
+                          )}
                           <span
                             className={`inline-flex items-center rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${config.badge}`}
                           >
@@ -329,7 +384,7 @@ export function AdminWorkspace({
                   })}
                 </div>
             )}
-              {!isSearching && staffMeta && staffMeta.totalPages > 1 && (
+              {!isFiltering && staffMeta && staffMeta.totalPages > 1 && (
                 <div
                   className="flex items-center justify-between border-t px-6 py-3.5"
                   style={{
