@@ -2,15 +2,35 @@
   "name": "leaveapp",
   "private": true,
   "version": "0.1.0",
+
   "scripts": {
     "install:all": "pnpm -C backend install && pnpm -C frontend install",
+    "build": "pnpm run build:all",
     "build:all": "pnpm -C backend run build && pnpm -C frontend run build",
-    "start:backend": "pnpm -C backend run start:prod",
-    "start:frontend": "pnpm -C frontend run start -- -p 3001",
-    "pm2:start": "pm2 start pm2-ecosystem.config.cjs",
-    "pm2:stop": "pm2 stop pm2-ecosystem.config.cjs",
-    "pm2:restart": "pm2 restart pm2-ecosystem.config.cjs",
-    "pm2:logs": "pm2 logs",
-    "pm2:delete": "pm2 delete pm2-ecosystem.config.cjs"
+
+    "start": "concurrently \"pnpm run start:backend\" \"pnpm run start:frontend\"",
+
+    "start:backend": "pnpm -C backend run start",
+    "start:frontend": "pnpm -C frontend run start",
+
+    "dev:backend": "pnpm -C backend run start:dev",
+    "dev:frontend": "pnpm -C frontend run dev",
+
+    "pm2:start": "pm2 start ecosystem.config.js",
+    "pm2:restart": "pm2 restart ecosystem.config.js",
+    "pm2:reload": "pm2 reload ecosystem.config.js",
+    "pm2:stop": "pm2 stop ecosystem.config.js",
+    "pm2:delete": "pm2 delete ecosystem.config.js",
+
+    "logs": "pm2 logs",
+    "logs:backend": "pm2 logs leaveapp-backend",
+    "logs:frontend": "pm2 logs leaveapp-frontend",
+
+    "status": "pm2 status",
+    "save": "pm2 save"
+  },
+
+  "engines": {
+  "node": ">=22"
   }
 }
