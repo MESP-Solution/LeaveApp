@@ -164,7 +164,7 @@ export function StaffWorkspace({
               {staff.fullName}
             </h4>
             <div className="flex items-center gap-1.5 mt-1">
-              <span className="inline-flex items-center gap-1 rounded-full bg-slate-200/80 px-2 py-0.5 text-[10px] font-medium text-slate-700">
+              <span className="inline-flex items-center gap-1 rounded-full bg-blue-50 px-2.5 py-1 text-[11px] font-semibold text-blue-700 border border-blue-100/50">
                 {staff.leaveCredit} phép khả dụng
               </span>
             </div>
@@ -188,7 +188,12 @@ export function StaffWorkspace({
                 min={todayDateKey}
                 disabled={isSubmitting}
                 onChange={(event) => handleDateChange(event.target.value)}
-                type="date"
+                type={leaveDate ? "date" : "text"}
+                placeholder="dd/mm/yyyy"
+                onFocus={(e) => (e.target.type = "date")}
+                onBlur={(e) => {
+                  if (!e.target.value) e.target.type = "text";
+                }}
                 value={leaveDate}
               />
             </div>

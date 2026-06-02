@@ -28,8 +28,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const currentRole = currentUser ? findRoleName(currentUser) : undefined;
   const showAdminTabs =
-    hasToken &&
-    (currentRole === "ADMIN" || currentRole === "HEAD" || currentRole === "MANAGER");
+    hasToken && (currentRole === "ADMIN" || currentRole === "MANAGER");
 
   async function handleLogout() {
     await fetch("/api/auth/logout", { method: "POST" }).catch(() => undefined);
@@ -125,12 +124,17 @@ export function AppShell({ children }: { children: ReactNode }) {
           {hasToken ? (
             <div className="flex shrink-0 items-center gap-2 sm:gap-3">
               {currentUser && (
-                <p
-                  className="hidden max-w-[140px] truncate text-2xs underline font-semibold md:block"
-                  style={{ color: "oklch(14% 0.006 264)" }}
-                >
-                  {currentUser.fullName}
-                </p>
+                <div className="flex items-center gap-2 mr-1">
+                  <p
+                    className="max-w-[160px] truncate text-sm font-semibold hidden md:block"
+                    style={{ color: "oklch(14% 0.006 264)" }}
+                  >
+                    {currentUser.fullName}
+                  </p>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-medium text-slate-600 border border-slate-200/60 whitespace-nowrap">
+                    {currentUser.department || (currentRole === "ADMIN" ? "Quản trị hệ thống" : "Chưa có phòng")}
+                  </span>
+                </div>
               )}
               <button
                 type="button"

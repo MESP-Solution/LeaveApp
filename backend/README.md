@@ -76,6 +76,7 @@ POST /auth/login
 GET /auth/me
 GET /staffs
 POST /staffs
+GET /departments
 GET /leave-requests
 GET /leave-requests?status=PENDING
 GET /leave-requests/:id
@@ -126,12 +127,15 @@ Authorization: Bearer <accessToken>
 
 Tạo nhân viên:
 
+`departmentId` là bắt buộc; lấy danh sách phòng ban từ `GET /departments`.
+
 ```json
 {
   "fullName": "Nguyễn Văn An",
   "email": "an@company.local",
   "password": "12345678",
   "roleId": 1,
+  "departmentId": 1,
   "leaveCredit": 12
 }
 ```

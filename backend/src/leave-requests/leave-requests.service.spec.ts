@@ -1,5 +1,6 @@
 import { EntityRepository } from '@mikro-orm/mysql';
-import { BadRequestException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Department } from '../database/entities/department.entity';
 import { LeaveRequest as DbLeaveRequest } from '../database/entities/leave-request.entity';
 import { Role } from '../database/entities/role.entity';
 import { Staff } from '../database/entities/staff.entity';
@@ -13,7 +14,10 @@ describe('LeaveRequestsService', () => {
   let dbRequests: DbLeaveRequest[];
   let leaveRequestsService: LeaveRequestsService;
   let nextId: number;
-  let staffsService: Pick<StaffsService, 'findByRoleName' | 'findEntityById'>;
+  let staffsService: Pick<
+    StaffsService,
+    'findEntityById' | 'findLeaveApprovers'
+  >;
   let mailService: Pick<MailService, 'sendWithAppResend'>;
 
   beforeEach(() => {
@@ -88,10 +92,14 @@ describe('LeaveRequestsService', () => {
 
         return Promise.resolve(staff);
       }),
-      findByRoleName: jest.fn(
-        (roleName: string): Promise<Staff[]> =>
+      findLeaveApprovers: jest.fn(
+        (departmentId: number | null): Promise<Staff[]> =>
           Promise.resolve(
-            mockStaffs.filter((staff) => staff.role.name === roleName),
+            mockStaffs.filter(
+              (staff) =>
+                staff.role.name === 'MANAGER' &&
+                staff.department?.id === departmentId,
+            ),
           ),
       ),
     };
@@ -109,8 +117,24 @@ describe('LeaveRequestsService', () => {
     jest.spyOn(leaveRequestsService as any, 'getNow').mockReturnValue(new Date('2026-05-01T00:00:00Z'));
   });
 
+  // Staff 1 creates their own requests; create() derives staffId from this requester.
+  const staffRequester = {
+    id: 1,
+    email: '1@company.local',
+    fullName: 'Nguyen Van An',
+    leaveCredit: 12,
+    role: 'STAFF',
+    departmentId: 1,
+  };
+
+  function createOwnRequest(
+    dto: Parameters<LeaveRequestsService['create']>[0],
+  ) {
+    return leaveRequestsService.create(dto, staffRequester);
+  }
+
   it('creates a pending leave request for one date', async () => {
-    const created = await leaveRequestsService.create({
+    const created = await createOwnRequest({
       leaveDate: '2026-05-04',
       reason: 'Family trip',
       staffId: 1,
@@ -123,8 +147,8 @@ describe('LeaveRequestsService', () => {
     expect(created.requests[0].staffId).toBe(1);
   });
 
-  it('notifies HEAD and MANAGER in one Resend request (batched recipients)', async () => {
-    await leaveRequestsService.create({
+  it('notifies only the department MANAGER in one Resend request', async () => {
+    await createOwnRequest({
       leaveDate: '2026-05-08',
       reason: 'Conference',
       staffId: 1,
@@ -134,17 +158,14 @@ describe('LeaveRequestsService', () => {
     await new Promise<void>((resolve) => setImmediate(resolve));
 
     expect(mailService.sendWithAppResend).toHaveBeenCalledTimes(1);
-    expect(mailService.sendWithAppResend).toHaveBeenCalledWith(
-      expect.objectContaining({
-        to: expect.arrayContaining(['2@company.local', '3@company.local']),
-      }),
-    );
+    // Recipients = the MANAGER(s) of the requester's department only (no ADMIN),
+    // so only MANAGER 2 (same department) is notified.
     expect((mailService.sendWithAppResend as jest.Mock).mock.calls[0][0].to)
-      .toHaveLength(2);
+      .toEqual(['2@company.local']);
   });
 
   it('creates half-day leave request and returns decimal totalDays', async () => {
-    const created = await leaveRequestsService.create({
+    const created = await createOwnRequest({
       leaveDate: '2026-05-05',
       reason: 'Family trip',
       staffId: 1,
@@ -160,7 +181,7 @@ describe('LeaveRequestsService', () => {
       new Error('SMTP down'),
     );
 
-    const created = await leaveRequestsService.create({
+    const created = await createOwnRequest({
       leaveDate: '2026-05-06',
       reason: 'Doctor appointment',
       staffId: 1,
@@ -172,7 +193,7 @@ describe('LeaveRequestsService', () => {
   });
 
   it('prevents duplicate leave requests on the same date', async () => {
-    await leaveRequestsService.create({
+    await createOwnRequest({
       leaveDate: '2026-05-04',
       reason: 'Family trip',
       staffId: 1,
@@ -180,7 +201,7 @@ describe('LeaveRequestsService', () => {
     });
 
     await expect(
-      leaveRequestsService.create({
+      createOwnRequest({
         leaveDate: '2026-05-04',
         reason: 'Family trip',
         staffId: 1,
@@ -189,8 +210,8 @@ describe('LeaveRequestsService', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
-  it('allows heads to approve pending requests', async () => {
-    const created = await leaveRequestsService.create({
+  it('allows managers to approve pending requests', async () => {
+    const created = await createOwnRequest({
       leaveDate: '2026-05-04',
       reason: 'Personal work',
       staffId: 1,
@@ -219,8 +240,8 @@ describe('LeaveRequestsService', () => {
     );
   });
 
-  it('allows heads to reject pending requests', async () => {
-    const created = await leaveRequestsService.create({
+  it('allows managers to reject pending requests', async () => {
+    const created = await createOwnRequest({
       leaveDate: '2026-05-04',
       reason: 'Personal work',
       staffId: 1,
@@ -239,8 +260,22 @@ describe('LeaveRequestsService', () => {
     expect(rejected.rejectReason).toBe('Trung lich hop');
   });
 
+  it('forbids a MANAGER from another department from processing the request', async () => {
+    const created = await createOwnRequest({
+      leaveDate: '2026-05-04',
+      reason: 'Personal work',
+      staffId: 1,
+      type: TypeLeave.FULL,
+    });
+
+    // Resolver 4 is a MANAGER in department 2; staff 1 belongs to department 1.
+    await expect(
+      leaveRequestsService.approve(created.requests[0].id, {}, 4),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
   it('rejects processing from regular staff', async () => {
-    const created = await leaveRequestsService.create({
+    const created = await createOwnRequest({
       leaveDate: '2026-05-04',
       reason: 'Personal work',
       staffId: 1,
@@ -249,11 +284,11 @@ describe('LeaveRequestsService', () => {
 
     await expect(
       leaveRequestsService.approve(created.requests[0].id, {}, 1),
-    ).rejects.toBeInstanceOf(BadRequestException);
+    ).rejects.toBeInstanceOf(ForbiddenException);
   });
 
   it('rejects processing requests already handled', async () => {
-    const created = await leaveRequestsService.create({
+    const created = await createOwnRequest({
       leaveDate: '2026-05-04',
       reason: 'Personal work',
       staffId: 1,
@@ -272,14 +307,14 @@ describe('LeaveRequestsService', () => {
   });
 
   it('uses app Resend key when manager approves a request', async () => {
-    const created = await leaveRequestsService.create({
+    const created = await createOwnRequest({
       leaveDate: '2026-05-07',
       reason: 'Personal work',
       staffId: 1,
       type: TypeLeave.FULL,
     });
 
-    await leaveRequestsService.approve(created.requests[0].id, {}, 3);
+    await leaveRequestsService.approve(created.requests[0].id, {}, 2);
 
     expect(mailService.sendWithAppResend).toHaveBeenLastCalledWith(
       expect.objectContaining({
@@ -289,12 +324,92 @@ describe('LeaveRequestsService', () => {
     );
   });
 
+  it('blocks approval that would drive leave credit negative', async () => {
+    // Staff 5 has 0.5 credit; a FULL day (weight 1) would go negative.
+    const created = await leaveRequestsService.create(
+      {
+        leaveDate: '2026-05-04',
+        reason: 'Personal work',
+        type: TypeLeave.FULL,
+      },
+      {
+        id: 5,
+        email: '5@company.local',
+        fullName: 'Vu Van Kiet',
+        leaveCredit: 0.5,
+        role: 'STAFF',
+        departmentId: 1,
+      },
+    );
+
+    await expect(
+      leaveRequestsService.approve(created.requests[0].id, {}, 2),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    // Credit must remain unchanged.
+    expect((await staffsService.findEntityById(5)).leaveCredit).toBe(0.5);
+  });
+
+  it('forbids a STAFF from viewing another staff leave request', async () => {
+    const created = await createOwnRequest({
+      leaveDate: '2026-05-04',
+      reason: 'Personal work',
+      staffId: 1,
+      type: TypeLeave.FULL,
+    });
+
+    await expect(
+      leaveRequestsService.findById(created.requests[0].id, {
+        id: 5,
+        email: '5@company.local',
+        fullName: 'Vu Van Kiet',
+        leaveCredit: 0.5,
+        role: 'STAFF',
+        departmentId: 1,
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('forbids a MANAGER from another department from viewing the request', async () => {
+    const created = await createOwnRequest({
+      leaveDate: '2026-05-04',
+      reason: 'Personal work',
+      staffId: 1,
+      type: TypeLeave.FULL,
+    });
+
+    await expect(
+      leaveRequestsService.findById(created.requests[0].id, {
+        id: 4,
+        email: '4@company.local',
+        fullName: 'Le Thi Hoa',
+        leaveCredit: 12,
+        role: 'MANAGER',
+        departmentId: 2,
+      }),
+    ).rejects.toBeInstanceOf(ForbiddenException);
+  });
+
+  it('allows the owner STAFF to view their own request', async () => {
+    const created = await createOwnRequest({
+      leaveDate: '2026-05-04',
+      reason: 'Personal work',
+      staffId: 1,
+      type: TypeLeave.FULL,
+    });
+
+    const found = await leaveRequestsService.findById(
+      created.requests[0].id,
+      staffRequester,
+    );
+    expect(found.id).toBe(created.requests[0].id);
+  });
+
   describe('Shift starting time validation', () => {
     it('blocks leave requests for a date in the past', async () => {
       jest.spyOn(leaveRequestsService as any, 'getNow').mockReturnValue(new Date('2026-05-15T09:00:00Z'));
 
       await expect(
-        leaveRequestsService.create({
+        createOwnRequest({
           leaveDate: '2026-05-14',
           reason: 'Sick leave',
           staffId: 1,
@@ -308,7 +423,7 @@ describe('LeaveRequestsService', () => {
     it('allows leave requests for a date in the future', async () => {
       jest.spyOn(leaveRequestsService as any, 'getNow').mockReturnValue(new Date('2026-05-15T09:00:00Z'));
 
-      const created = await leaveRequestsService.create({
+      const created = await createOwnRequest({
         leaveDate: '2026-05-18',
         reason: 'Future planning',
         staffId: 1,
@@ -320,7 +435,7 @@ describe('LeaveRequestsService', () => {
 
     it('handles today morning leave requests correctly based on 8:30 AM shift start', async () => {
       jest.spyOn(leaveRequestsService as any, 'getNow').mockReturnValue(new Date('2026-05-15T01:15:00Z'));
-      const allowed = await leaveRequestsService.create({
+      const allowed = await createOwnRequest({
         leaveDate: '2026-05-15',
         reason: 'Morning appointment',
         staffId: 1,
@@ -332,7 +447,7 @@ describe('LeaveRequestsService', () => {
 
       jest.spyOn(leaveRequestsService as any, 'getNow').mockReturnValue(new Date('2026-05-15T01:30:00Z'));
       await expect(
-        leaveRequestsService.create({
+        createOwnRequest({
           leaveDate: '2026-05-15',
           reason: 'Morning appointment',
           staffId: 1,
@@ -345,7 +460,7 @@ describe('LeaveRequestsService', () => {
 
     it('handles today afternoon leave requests correctly based on 1:30 PM shift start', async () => {
       jest.spyOn(leaveRequestsService as any, 'getNow').mockReturnValue(new Date('2026-05-15T06:15:00Z'));
-      const allowed = await leaveRequestsService.create({
+      const allowed = await createOwnRequest({
         leaveDate: '2026-05-15',
         reason: 'Afternoon event',
         staffId: 1,
@@ -357,7 +472,7 @@ describe('LeaveRequestsService', () => {
 
       jest.spyOn(leaveRequestsService as any, 'getNow').mockReturnValue(new Date('2026-05-15T06:35:00Z'));
       await expect(
-        leaveRequestsService.create({
+        createOwnRequest({
           leaveDate: '2026-05-15',
           reason: 'Afternoon event',
           staffId: 1,
@@ -370,7 +485,7 @@ describe('LeaveRequestsService', () => {
 
     it('handles today full day leave requests correctly based on 8:30 AM shift start', async () => {
       jest.spyOn(leaveRequestsService as any, 'getNow').mockReturnValue(new Date('2026-05-15T01:00:00Z'));
-      const allowed = await leaveRequestsService.create({
+      const allowed = await createOwnRequest({
         leaveDate: '2026-05-15',
         reason: 'Full day trip',
         staffId: 1,
@@ -382,7 +497,7 @@ describe('LeaveRequestsService', () => {
 
       jest.spyOn(leaveRequestsService as any, 'getNow').mockReturnValue(new Date('2026-05-15T01:30:00Z'));
       await expect(
-        leaveRequestsService.create({
+        createOwnRequest({
           leaveDate: '2026-05-15',
           reason: 'Full day trip',
           staffId: 1,
@@ -395,20 +510,31 @@ describe('LeaveRequestsService', () => {
   });
 });
 
+// Staff 2 is the sole MANAGER of department 1 and processes staff 1's requests.
+// Staff 4 is a MANAGER in department 2 (used for the cross-department denial test).
 const mockStaffs = [
-  createMockStaff(1, 'Nguyen Van An', 'STAFF'),
-  createMockStaff(2, 'Pham Thu Ha', 'HEAD'),
-  createMockStaff(3, 'Tran Minh Quan', 'MANAGER'),
+  createMockStaff(1, 'Nguyen Van An', 'STAFF', 1),
+  createMockStaff(2, 'Pham Thu Ha', 'MANAGER', 1),
+  createMockStaff(3, 'Tran Minh Quan', 'STAFF', 1),
+  createMockStaff(4, 'Le Thi Hoa', 'MANAGER', 2),
+  // Staff 5: STAFF in department 1 with only 0.5 day of credit left.
+  createMockStaff(5, 'Vu Van Kiet', 'STAFF', 1, 0.5),
 ];
 
 function createMockStaff(
   id: number,
   fullName: string,
   roleName: string,
+  departmentId: number,
+  leaveCredit = 12,
 ): Staff {
   const role = new Role();
   role.id = id;
   role.name = roleName;
+
+  const department = new Department();
+  department.id = departmentId;
+  department.name = `DEPT-${departmentId}`;
 
   const staff = new Staff();
   staff.id = id;
@@ -416,7 +542,8 @@ function createMockStaff(
   staff.email = `${id}@company.local`;
   staff.passwordHash = 'hashed-password';
   staff.role = role;
-  staff.leaveCredit = 12;
+  staff.department = department;
+  staff.leaveCredit = leaveCredit;
   staff.createdAt = new Date();
   staff.updatedAt = new Date();
 

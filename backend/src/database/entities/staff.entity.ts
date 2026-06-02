@@ -6,6 +6,7 @@ import {
   PrimaryKey,
   Property,
 } from '@mikro-orm/core';
+import { Department } from './department.entity';
 import { LeaveRequest } from './leave-request.entity';
 import { Role } from './role.entity';
 
@@ -28,6 +29,13 @@ export class Staff {
     inversedBy: (role: Role) => role.staffs,
   })
   role!: Role;
+
+  @ManyToOne(() => Department, {
+    joinColumn: 'department_id',
+    inversedBy: (department: Department) => department.staffs,
+    nullable: true,
+  })
+  department?: Department;
 
   @Property({ type: 'decimal', precision: 6, scale: 2, default: 12 })
   leaveCredit!: number;

@@ -32,6 +32,16 @@ export class CreateStaffDto {
   @Min(1)
   roleId?: number;
 
+  @ApiPropertyOptional({
+    example: 1,
+    description:
+      'Department id the staff belongs to. Required for all roles except ADMIN.',
+  })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  departmentId?: number;
+
   @ApiPropertyOptional({ example: 12, default: 12 })
   @IsOptional()
   @IsNumber({ maxDecimalPlaces: 2 })

@@ -5,11 +5,11 @@ const mappedStaff = mapStaffFromApi({
   id: 10,
   fullName: "Demo User",
   email: "demo@company.local",
-  role: "HEAD",
+  role: "MANAGER",
   leaveCredit: 15,
   createdAt: "2026-05-07T00:00:00.000Z",
 });
-assert.equal(mappedStaff.roleId, 3);
+assert.equal(mappedStaff.roleId, 2);
 assert.equal(mappedStaff.email, "demo@company.local");
 
 const mappedRequest = mapLeaveRequestFromApi({

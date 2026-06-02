@@ -10,7 +10,7 @@ export function Metrics({
   const metrics = [
     { label: "Nhân sự", value: staffs.length },
     {
-      label: "Chờ HEAD duyệt",
+      label: "Chờ duyệt",
       value: requests.filter((request) => request.status === "PENDING").length,
     },
     {

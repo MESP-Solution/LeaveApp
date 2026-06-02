@@ -6,6 +6,7 @@ type StaffApiDto = {
   fullName: string;
   email: string;
   role: string;
+  department?: string | null;
   leaveCredit: number;
   createdAt: string;
 };
@@ -29,6 +30,7 @@ export function mapStaffFromApi(dto: StaffApiDto): StaffRecord {
     fullName: dto.fullName,
     email: dto.email,
     roleId: roleNameToId(dto.role),
+    department: dto.department ?? null,
     leaveCredit: dto.leaveCredit,
     createdAt: dto.createdAt,
     updatedAt: dto.createdAt,
@@ -54,7 +56,6 @@ export function mapLeaveRequestFromApi(dto: LeaveRequestApiDto): LeaveRequestRec
 export function roleNameToId(roleName: string): number {
   const roleIds: Record<StaffRoleName, number> = {
     ADMIN: 4,
-    HEAD: 3,
     MANAGER: 2,
     STAFF: 1,
   };

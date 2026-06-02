@@ -13,6 +13,9 @@ export class StaffResponseDto {
   @ApiProperty({ example: 'STAFF' })
   role!: string;
 
+  @ApiProperty({ example: 'IT', nullable: true })
+  department!: string | null;
+
   @ApiProperty({ example: 12 })
   leaveCredit!: number;
 

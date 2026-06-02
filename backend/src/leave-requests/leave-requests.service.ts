@@ -2,12 +2,13 @@ import { EntityRepository } from '@mikro-orm/mysql';
 import { InjectRepository } from '@mikro-orm/nestjs';
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
 } from '@nestjs/common';
+import type { AuthenticatedStaff } from '../auth/auth.types';
 import { LeaveRequest as DbLeaveRequest } from '../database/entities/leave-request.entity';
-import { Staff } from '../database/entities/staff.entity';
 import { LeaveStatus } from '../database/enums/leave-status.enum';
 import { TypeLeave } from '../database/enums/type-leave.enum';
 import { approverNotificationHtml, outcomeNotificationHtml } from '../mail/email-templates';
@@ -35,8 +36,11 @@ export class LeaveRequestsService {
 
   async create(
     dto: CreateLeaveRequestDto,
+    requester: AuthenticatedStaff,
   ): Promise<CreateLeaveRequestResponse> {
-    const staff = await this.staffsService.findEntityById(dto.staffId);
+    // A staff can only create a leave request for themselves; the body's
+    // staffId (if any) is ignored to prevent creating requests on behalf.
+    const staff = await this.staffsService.findEntityById(requester.id);
 
     if (!dto.reason?.trim()) {
       throw new BadRequestException('Leave reason is required');
@@ -83,19 +87,20 @@ export class LeaveRequestsService {
   }
 
   async findAll(
-    status?: LeaveRequestStatus,
+    status: LeaveRequestStatus | undefined,
     page = 1,
     limit = 10,
+    requester: AuthenticatedStaff,
     staffId?: number,
   ): Promise<{ data: LeaveRequest[]; meta: PaginationMetaDto }> {
     const safePage = Math.max(1, page);
     const safeLimit = Math.min(100, Math.max(1, limit));
-    const filter: Record<string, unknown> = {};
+    const filter: Record<string, unknown> = this.buildListScope(
+      requester,
+      staffId,
+    );
     if (status) {
       filter.status = this.toDbStatus(status);
-    }
-    if (typeof staffId === 'number' && staffId > 0) {
-      filter.staff = staffId;
     }
     const offset = (safePage - 1) * safeLimit;
 
@@ -123,8 +128,13 @@ export class LeaveRequestsService {
     };
   }
 
-  async findById(id: number): Promise<LeaveRequest> {
-    return this.toResponse(await this.findEntityById(id));
+  async findById(
+    id: number,
+    requester: AuthenticatedStaff,
+  ): Promise<LeaveRequest> {
+    const leaveRequest = await this.findEntityById(id);
+    this.assertCanView(leaveRequest, requester);
+    return this.toResponse(leaveRequest);
   }
 
   async approve(
@@ -151,15 +161,38 @@ export class LeaveRequestsService {
   ): Promise<LeaveRequest> {
     const resolverStaff =
       await this.staffsService.findEntityById(resolverStaffId);
-    if (!['HEAD', 'MANAGER', 'ADMIN'].includes(resolverStaff.role.name)) {
-      throw new BadRequestException(
-        'Only HEAD, MANAGER, or ADMIN can process leave requests',
+    const resolverRole = resolverStaff.role.name.toUpperCase();
+    if (!['MANAGER', 'ADMIN'].includes(resolverRole)) {
+      throw new ForbiddenException(
+        'Only MANAGER or ADMIN can process leave requests',
       );
     }
 
     const leaveRequest = await this.findEntityById(id);
     if (leaveRequest.status !== LeaveStatus.PENDING) {
       throw new BadRequestException('Leave request is already processed');
+    }
+
+    // MANAGER can only process requests from their own department.
+    if (resolverRole === 'MANAGER') {
+      const resolverDeptId = resolverStaff.department?.id;
+      const requesterDeptId = leaveRequest.staff.department?.id;
+      if (!resolverDeptId || resolverDeptId !== requesterDeptId) {
+        throw new ForbiddenException(
+          'You can only process leave requests from your own department',
+        );
+      }
+    }
+
+    const typeWeight = this.getTypeWeight(leaveRequest.type);
+    // Approving must never drive the staff's leave credit negative.
+    if (
+      status === LeaveStatus.APPROVED &&
+      Number(leaveRequest.staff.leaveCredit) < typeWeight
+    ) {
+      throw new BadRequestException(
+        'Insufficient leave credit to approve this request',
+      );
     }
 
     leaveRequest.status = status;
@@ -169,8 +202,7 @@ export class LeaveRequestsService {
       status === LeaveStatus.REJECTED ? dto.note?.trim() : undefined;
     if (status === LeaveStatus.APPROVED) {
       leaveRequest.staff.leaveCredit = Number(
-        Number(leaveRequest.staff.leaveCredit) -
-        this.getTypeWeight(leaveRequest.type),
+        Number(leaveRequest.staff.leaveCredit) - typeWeight,
       );
     }
 
@@ -197,10 +229,69 @@ export class LeaveRequestsService {
     return this.toResponse(leaveRequest);
   }
 
+  /**
+   * Restricts which leave requests a requester may list:
+   * - STAFF: only their own requests.
+   * - MANAGER: only requests of staff in their department.
+   * - ADMIN: everything (optionally narrowed by staffId).
+   */
+  private buildListScope(
+    requester: AuthenticatedStaff,
+    staffId?: number,
+  ): Record<string, unknown> {
+    const role = requester.role.toUpperCase();
+
+    if (role === 'STAFF') {
+      return { staff: requester.id };
+    }
+
+    if (role === 'MANAGER') {
+      if (typeof requester.departmentId !== 'number') {
+        throw new ForbiddenException('No department assigned to your account');
+      }
+      return { staff: { department: requester.departmentId } };
+    }
+
+    // ADMIN: full access, optional staffId narrowing.
+    if (typeof staffId === 'number' && staffId > 0) {
+      return { staff: staffId };
+    }
+    return {};
+  }
+
+  /**
+   * Authorizes viewing a single leave request, mirroring buildListScope.
+   */
+  private assertCanView(
+    leaveRequest: DbLeaveRequest,
+    requester: AuthenticatedStaff,
+  ): void {
+    const role = requester.role.toUpperCase();
+
+    if (role === 'ADMIN') {
+      return;
+    }
+    if (role === 'STAFF') {
+      if (leaveRequest.staff.id !== requester.id) {
+        throw new ForbiddenException('You can only view your own leave requests');
+      }
+      return;
+    }
+    // MANAGER: same department only.
+    if (
+      typeof requester.departmentId !== 'number' ||
+      leaveRequest.staff.department?.id !== requester.departmentId
+    ) {
+      throw new ForbiddenException(
+        'You can only view leave requests from your own department',
+      );
+    }
+  }
+
   private async findEntityById(id: number): Promise<DbLeaveRequest> {
     const leaveRequest = await this.leaveRequestRepository.findOne(
       { id },
-      { populate: ['resolvedByStaff', 'staff'] },
+      { populate: ['resolvedByStaff', 'staff', 'staff.department'] },
     );
     if (!leaveRequest) {
       throw new NotFoundException('Leave request not found');
@@ -225,17 +316,10 @@ export class LeaveRequestsService {
   }
 
   private async notifyApprovers(leaveRequest: DbLeaveRequest): Promise<void> {
-    const [heads, managers] = await Promise.all([
-      this.staffsService.findByRoleName('HEAD'),
-      this.staffsService.findByRoleName('MANAGER'),
-    ]);
-    const byId = new Map<number, Staff>();
-    for (const staff of [...heads, ...managers]) {
-      byId.set(staff.id, staff);
-    }
-    const approvers = Array.from(byId.values()).filter((staff) =>
-      Boolean(staff.email?.trim()),
-    );
+    // Only the MANAGER(s) of the requester's department are notified.
+    const departmentId = leaveRequest.staff.department?.id ?? null;
+    const approvers =
+      await this.staffsService.findLeaveApprovers(departmentId);
 
     this.logger.debug(
       `Notifying approvers for leaveRequestId=${leaveRequest.id} leaveDate=${leaveRequest.leaveDate} recipients=${approvers.map((a) => a.email).join(',') || '(none)'}`,

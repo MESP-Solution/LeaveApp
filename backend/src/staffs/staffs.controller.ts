@@ -40,12 +40,15 @@ export class StaffsController {
   })
   @ApiQuery({ name: 'page', required: false, example: 1 })
   @ApiQuery({ name: 'limit', required: false, example: 10 })
+  @ApiBearerAuth('jwt')
+  @UseGuards(JwtAuthGuard)
   @Get()
   findAll(
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+    @CurrentStaff() currentStaff: AuthenticatedStaff,
   ) {
-    return this.staffsService.findAll(page, limit);
+    return this.staffsService.findAll(page, limit, currentStaff);
   }
 
   @ApiSuccessResponse({
@@ -67,13 +70,19 @@ export class StaffsController {
     status: 200,
     type: StaffResponseDto,
   })
+  @ApiBearerAuth('jwt')
+  @UseGuards(JwtAuthGuard)
   @Get(':id')
-  findById(@Param('id', ParseIntPipe) id: number) {
-    return this.staffsService.findById(id);
+  findById(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentStaff() currentStaff: AuthenticatedStaff,
+  ) {
+    return this.staffsService.findById(id, currentStaff);
   }
 
   @ApiErrorResponse({ status: 409, description: 'Email already exists' })
   @ApiErrorResponse({ status: 404, description: 'Role not found' })
+  @ApiErrorResponse({ status: 404, description: 'Department not found' })
   @ApiSuccessResponse({
     description: 'Staff created',
     status: 201,
@@ -97,6 +106,9 @@ export class StaffsController {
     status: 200,
     type: StaffResponseDto,
   })
+  @ApiBearerAuth('jwt')
+  @UseGuards(JwtAuthGuard, RolesGuard)
+  @Roles('ADMIN', 'MANAGER')
   @Patch(':id')
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateStaffDto) {
     return this.staffsService.update(id, dto);

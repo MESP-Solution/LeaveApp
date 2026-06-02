@@ -8,6 +8,7 @@ type CreateStaffInput = {
   email: string;
   password: string;
   roleId?: number;
+  departmentId?: number;
   leaveCredit?: number;
 };
 
@@ -16,6 +17,7 @@ type StaffApiDto = {
   fullName: string;
   email: string;
   role: string;
+  department?: string | null;
   leaveCredit: number;
   createdAt: string;
 };

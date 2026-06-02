@@ -1,14 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { X, User, Mail, Shield, Award, Key } from "lucide-react";
-import type { RoleRecord, StaffRecord, StaffRoleName } from "@/types/leave-app";
+import { X, User, Mail, Shield, Key, Building2 } from "lucide-react";
+import type {
+  DepartmentRecord,
+  RoleRecord,
+  StaffRecord,
+  StaffRoleName,
+} from "@/types/leave-app";
 import { findRoleName } from "@/lib/leave-app-helpers";
 import { useToast } from "./toast";
 
 const roleLabelByName: Record<StaffRoleName, string> = {
   ADMIN: "Admin",
-  HEAD: "Trưởng phòng",
   MANAGER: "Quản lý",
   STAFF: "Nhân viên",
 };
@@ -17,13 +21,17 @@ interface AdminCreateStaffModalProps {
   isOpen: boolean;
   onClose: () => void;
   roles: RoleRecord[];
-  currentRole: "ADMIN" | "HEAD" | "MANAGER";
+  departments: DepartmentRecord[];
+  currentRole: "ADMIN" | "MANAGER";
   staffs: StaffRecord[];
+  /** When set (e.g. MANAGER), the department is locked to this id. */
+  lockedDepartmentId?: number | null;
   onCreateStaff: (input: {
     fullName: string;
     email: string;
     password: string;
     roleId?: number;
+    departmentId?: number;
     leaveCredit?: number;
   }) => Promise<void>;
 }
@@ -32,8 +40,10 @@ export function AdminCreateStaffModal({
   isOpen,
   onClose,
   roles,
+  departments,
   currentRole,
   staffs,
+  lockedDepartmentId,
   onCreateStaff,
 }: AdminCreateStaffModalProps) {
   const toast = useToast();
@@ -47,12 +57,33 @@ export function AdminCreateStaffModal({
     email: "",
     password: "",
     roleId: defaultRoleId,
+    departmentId: 0,
     leaveCredit: 12,
   });
 
   const selectedRoleId = roleOptions.some((option) => option.value === form.roleId)
     ? form.roleId
     : defaultRoleId;
+
+  // ADMIN does not belong to a department; every other role must pick one.
+  const selectedRoleName = roles.find((role) => role.id === selectedRoleId)?.name;
+  const isAdminRole = selectedRoleName === "ADMIN";
+  // Each department may have only one MANAGER, so when creating a MANAGER we
+  // disable departments that already have one (mirrors the backend rule).
+  const isManagerRole = selectedRoleName === "MANAGER";
+  const departmentsWithManager = new Set(
+    staffs
+      .filter((staff) => findRoleName(staff) === "MANAGER")
+      .map((staff) => staff.department)
+      .filter((name): name is string => Boolean(name)),
+  );
+  // MANAGER can only create staff within their own (locked) department.
+  const isDepartmentLocked = typeof lockedDepartmentId === "number";
+  const effectiveDepartmentId = isAdminRole
+    ? 0
+    : isDepartmentLocked
+      ? lockedDepartmentId
+      : form.departmentId;
 
   if (!isOpen) return null;
 
@@ -69,6 +100,11 @@ export function AdminCreateStaffModal({
       return;
     }
 
+    if (!isAdminRole && !isDepartmentLocked && !form.departmentId) {
+      toast.warning("Vui lòng chọn phòng ban cho nhân viên.");
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       await onCreateStaff({
@@ -76,6 +112,7 @@ export function AdminCreateStaffModal({
         email: form.email.trim(),
         password: form.password,
         roleId: Number(selectedRoleId),
+        departmentId: isAdminRole ? undefined : Number(effectiveDepartmentId),
         leaveCredit: Number(form.leaveCredit),
       });
       setForm({
@@ -83,6 +120,7 @@ export function AdminCreateStaffModal({
         email: "",
         password: "",
         roleId: defaultRoleId,
+        departmentId: 0,
         leaveCredit: 12,
       });
       toast.success("Tạo nhân viên thành công.");
@@ -228,26 +266,43 @@ export function AdminCreateStaffModal({
               </div>
             </div>
 
-            {/* Leave credit */}
-            {/* <div className="grid gap-1.5">
+            {/* Department select (not required for ADMIN) */}
+            <div className="grid gap-1.5">
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
-                Ngày phép khởi đầu
+                Phòng ban
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none text-slate-400">
-                  <Award className="w-4 h-4" />
+                  <Building2 className="w-4 h-4" />
                 </div>
-                <input
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50/50 pl-10 pr-3 py-2.5 text-sm font-normal text-slate-900 outline-none transition-all duration-150 placeholder:text-slate-400 focus:border-slate-950 focus:bg-white focus:ring-1 focus:ring-slate-950/10"
-                  min={1}
+                <select
+                  className="w-full rounded-lg border border-slate-200 bg-slate-50/50 pl-10 pr-3 py-2.5 text-sm font-normal text-slate-900 outline-none transition-all duration-150 appearance-none bg-[url('data:image/svg+xml;charset=utf-8,%3Csvg%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%20viewBox%3D%220%200%2020%2020%20%22%20fill%3D%22none%22%3E%3Cpath%20d%3D%22M7%209l3%203%203-3%22%20stroke%3D%22%236b7280%22%20stroke-width%3D%221.5%22%20stroke-linecap%3D%22round%22%20stroke-linejoin%3D%22round%22%2F%3E%3C%2Fsvg%3E')] bg-[size:1.25rem] bg-[position:right_0.5rem_center] bg-no-repeat focus:border-slate-950 focus:bg-white focus:ring-1 focus:ring-slate-950/10 cursor-pointer disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400"
+                  disabled={isAdminRole || isDepartmentLocked}
                   onChange={(event) =>
-                    setForm((current) => ({ ...current, leaveCredit: Number(event.target.value) }))
+                    setForm((current) => ({ ...current, departmentId: Number(event.target.value) }))
                   }
-                  type="number"
-                  value={form.leaveCredit}
-                />
+                  value={effectiveDepartmentId}
+                >
+                  <option value={0} disabled>
+                    {isAdminRole ? "Không áp dụng" : "Chọn phòng ban..."}
+                  </option>
+                  {departments.map((department) => {
+                    const takenByManager =
+                      isManagerRole && departmentsWithManager.has(department.name);
+                    return (
+                      <option
+                        key={department.id}
+                        value={department.id}
+                        disabled={takenByManager}
+                      >
+                        {department.name}
+                        {takenByManager ? " (đã có quản lý)" : ""}
+                      </option>
+                    );
+                  })}
+                </select>
               </div>
-            </div> */}
+            </div>
           </div>
 
           <button
@@ -271,7 +326,7 @@ export function AdminCreateStaffModal({
 }
 
 function getRoleOptions(
-  currentRole: "ADMIN" | "HEAD" | "MANAGER",
+  currentRole: "ADMIN" | "MANAGER",
   hasAdmin: boolean,
   roles: RoleRecord[]
 ): Array<{ value: number; label: string; disabled?: boolean }> {
@@ -281,10 +336,7 @@ function getRoleOptions(
     disabled: role.name === "ADMIN" ? hasAdmin : false,
   }));
 
-  if (currentRole === "ADMIN") {
-    return all;
-  }
-
+  // MANAGER can only create STAFF; ADMIN can create any role.
   if (currentRole === "MANAGER") {
     return all.filter((opt) => opt.label === "STAFF");
   }

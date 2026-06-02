@@ -49,11 +49,14 @@ export class LeaveRequestsController {
     isArray: true,
     type: LeaveRequestResponseDto,
   })
+  @ApiBearerAuth('jwt')
+  @UseGuards(JwtAuthGuard)
   @Get()
   findAll(
     @Query('status') status: LeaveRequestStatus | undefined,
     @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
     @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+    @CurrentStaff() currentStaff: AuthenticatedStaff,
     @Query('staffId') staffIdRaw?: string,
   ) {
     const staffId = staffIdRaw ? Number(staffIdRaw) : undefined;
@@ -61,7 +64,13 @@ export class LeaveRequestsController {
       typeof staffId === 'number' && Number.isFinite(staffId) && staffId > 0
         ? staffId
         : undefined;
-    return this.leaveRequestsService.findAll(status, page, limit, safeStaffId);
+    return this.leaveRequestsService.findAll(
+      status,
+      page,
+      limit,
+      currentStaff,
+      safeStaffId,
+    );
   }
 
   @ApiErrorResponse({ status: 404, description: 'Leave request not found' })
@@ -70,9 +79,14 @@ export class LeaveRequestsController {
     status: 200,
     type: LeaveRequestResponseDto,
   })
+  @ApiBearerAuth('jwt')
+  @UseGuards(JwtAuthGuard)
   @Get(':id')
-  findById(@Param('id', ParseIntPipe) id: number) {
-    return this.leaveRequestsService.findById(id);
+  findById(
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentStaff() currentStaff: AuthenticatedStaff,
+  ) {
+    return this.leaveRequestsService.findById(id, currentStaff);
   }
 
   @ApiErrorResponse({
@@ -85,9 +99,14 @@ export class LeaveRequestsController {
     status: 201,
     type: CreateLeaveRequestResponseDto,
   })
+  @ApiBearerAuth('jwt')
+  @UseGuards(JwtAuthGuard)
   @Post()
-  create(@Body() dto: CreateLeaveRequestDto) {
-    return this.leaveRequestsService.create(dto);
+  create(
+    @Body() dto: CreateLeaveRequestDto,
+    @CurrentStaff() currentStaff: AuthenticatedStaff,
+  ) {
+    return this.leaveRequestsService.create(dto, currentStaff);
   }
 
   @ApiErrorResponse({
@@ -105,7 +124,7 @@ export class LeaveRequestsController {
   })
   @ApiBearerAuth('jwt')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('HEAD', 'MANAGER', 'ADMIN')
+  @Roles('MANAGER', 'ADMIN')
   @Patch(':id/approve')
   approve(
     @Param('id', ParseIntPipe) id: number,
@@ -130,7 +149,7 @@ export class LeaveRequestsController {
   })
   @ApiBearerAuth('jwt')
   @UseGuards(JwtAuthGuard, RolesGuard)
-  @Roles('HEAD', 'MANAGER', 'ADMIN')
+  @Roles('MANAGER', 'ADMIN')
   @Patch(':id/reject')
   reject(
     @Param('id', ParseIntPipe) id: number,

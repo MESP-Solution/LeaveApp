@@ -1,4 +1,4 @@
-export const STAFF_ROLE_NAMES = ["STAFF", "MANAGER", "HEAD", "ADMIN"] as const;
+export const STAFF_ROLE_NAMES = ["STAFF", "MANAGER", "ADMIN"] as const;
 export type StaffRoleName = (typeof STAFF_ROLE_NAMES)[number];
 
 export const ERD_LEAVE_STATUSES = ["PENDING", "APPROVED", "REJECTED"] as const;
@@ -15,12 +15,20 @@ export interface RoleRecord {
   name: StaffRoleName;
 }
 
+export interface DepartmentRecord {
+  id: number;
+  name: string;
+  description?: string | null;
+}
+
 export interface StaffRecord {
   id: number;
   fullName: string;
   email: string;
   passwordHash?: string;
   roleId: number;
+  departmentId?: number | null;
+  department?: string | null;
   leaveCredit: number;
   createdBy?: number;
   createdAt: string;

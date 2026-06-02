@@ -1,5 +1,6 @@
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { Module } from '@nestjs/common';
+import { Department } from '../database/entities/department.entity';
 import { LeaveRequest } from '../database/entities/leave-request.entity';
 import { Role } from '../database/entities/role.entity';
 import { Staff } from '../database/entities/staff.entity';
@@ -7,7 +8,7 @@ import { StaffsController } from './staffs.controller';
 import { StaffsService } from './staffs.service';
 
 @Module({
-  imports: [MikroOrmModule.forFeature([Staff, Role, LeaveRequest])],
+  imports: [MikroOrmModule.forFeature([Staff, Role, Department, LeaveRequest])],
   controllers: [StaffsController],
   providers: [StaffsService],
   exports: [StaffsService],

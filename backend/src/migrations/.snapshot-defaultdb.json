@@ -19,6 +19,116 @@
           "enumItems": [],
           "mappedType": "integer"
         },
+        "name": {
+          "name": "name",
+          "type": "varchar(64)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": true,
+          "length": 64,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "string"
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": 65535,
+          "precision": null,
+          "scale": null,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "text"
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "datetime(3)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 3,
+          "precision": null,
+          "scale": null,
+          "default": "current_timestamp(3)",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "datetime"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "datetime(3)",
+          "unsigned": false,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": false,
+          "unique": false,
+          "length": 3,
+          "precision": null,
+          "scale": null,
+          "default": "current_timestamp(3)",
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "datetime",
+          "extra": "on update CURRENT_TIMESTAMP(3)"
+        }
+      },
+      "name": "departments",
+      "indexes": [
+        {
+          "columnNames": [
+            "name"
+          ],
+          "keyName": "departments_name_unique",
+          "unique": true,
+          "primary": false,
+          "constraint": true
+        },
+        {
+          "columnNames": [
+            "id"
+          ],
+          "keyName": "PRIMARY",
+          "unique": true,
+          "primary": true,
+          "constraint": true
+        }
+      ],
+      "checks": [],
+      "foreignKeys": {},
+      "nativeEnums": {},
+      "comment": ""
+    },
+    {
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "int",
+          "unsigned": true,
+          "autoincrement": true,
+          "primary": true,
+          "nullable": false,
+          "unique": false,
+          "length": null,
+          "precision": 10,
+          "scale": 0,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "integer"
+        },
         "staff_id": {
           "name": "staff_id",
           "type": "int",
@@ -195,7 +305,7 @@
           "columnNames": [
             "resolved_by"
           ],
-          "keyName": "leave_requests_resolved_by_foreign",
+          "keyName": "leave_requests_resolved_by_index",
           "unique": false,
           "primary": false,
           "constraint": false
@@ -205,15 +315,6 @@
             "staff_id"
           ],
           "keyName": "leave_requests_staff_id_index",
-          "unique": false,
-          "primary": false,
-          "constraint": false
-        },
-        {
-          "columnNames": [
-            "status"
-          ],
-          "keyName": "leave_requests_status_index",
           "unique": false,
           "primary": false,
           "constraint": false
@@ -467,6 +568,22 @@
           "enumItems": [],
           "mappedType": "datetime",
           "extra": "on update CURRENT_TIMESTAMP(3)"
+        },
+        "department_id": {
+          "name": "department_id",
+          "type": "int",
+          "unsigned": true,
+          "autoincrement": false,
+          "primary": false,
+          "nullable": true,
+          "unique": false,
+          "length": null,
+          "precision": 10,
+          "scale": 0,
+          "default": null,
+          "comment": null,
+          "enumItems": [],
+          "mappedType": "integer"
         }
       },
       "name": "staffs",
@@ -485,6 +602,15 @@
             "created_by"
           ],
           "keyName": "staffs_created_by_index",
+          "unique": false,
+          "primary": false,
+          "constraint": false
+        },
+        {
+          "columnNames": [
+            "department_id"
+          ],
+          "keyName": "staffs_department_id_index",
           "unique": false,
           "primary": false,
           "constraint": false
@@ -522,6 +648,19 @@
           ],
           "updateRule": "cascade",
           "deleteRule": "set null"
+        },
+        "staffs_department_id_foreign": {
+          "columnNames": [
+            "department_id"
+          ],
+          "constraintName": "staffs_department_id_foreign",
+          "localTableName": "staffs",
+          "referencedTableName": "departments",
+          "referencedColumnNames": [
+            "id"
+          ],
+          "updateRule": "cascade",
+          "deleteRule": "no action"
         },
         "staffs_role_id_foreign": {
           "columnNames": [
